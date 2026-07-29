@@ -473,17 +473,13 @@ public class FilterTokenizer extends Tokenizer {
     }
 
     private static String stripQuotes(String word) {
-        while (word.length() > 1 && isMatchingQuotePair(word.charAt(0), word.charAt(word.length() - 1)))
+        while (word.length() > 1 && isQuote(word.charAt(0)) && isQuote(word.charAt(word.length() - 1)))
             word = word.substring(1, word.length() - 1);
         return word;
     }
 
-    private static boolean isMatchingQuotePair(char open, char close) {
-        return (open == '\"' && close == '\"')
-                || (open == '\'' && close == '\'')
-                || (open == '\u201C' && close == '\u201D')
-                || (open == '\u2018' && close == '\u2019')
-                || (open == '\u00AB' && close == '\u00BB');
+    private static boolean isQuote(char c) {
+        return c == '\"' || c == '\'' || c == '\u201C' || c == '\u201D' || c == '\u2018' || c == '\u2019' || c == '\u00AB' || c == '\u00BB';
     }
     
     private boolean checkToggled(TokenizerParams params, Filter filter) {
