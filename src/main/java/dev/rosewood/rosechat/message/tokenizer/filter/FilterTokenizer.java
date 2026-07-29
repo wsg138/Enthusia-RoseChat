@@ -429,7 +429,8 @@ public class FilterTokenizer extends Tokenizer {
                     String[] words = input.split(" ");
                     int charIndex = 0;
                     for (String word : words) {
-                        if (word.equalsIgnoreCase(match)) {
+                        String strippedWord = stripQuotes(word);
+                        if (strippedWord.equalsIgnoreCase(match)) {
                             int end = charIndex + word.length();
                             if (!SensitivityMatch.overlaps(matches, charIndex, end))
                                 matches.add(new SensitivityMatch(charIndex, end));
@@ -450,7 +451,7 @@ public class FilterTokenizer extends Tokenizer {
         int charIndex = 0;
         for (int i = 0; i < strippedWords.length; i++) {
             String word = words[i];
-            String strippedWord = strippedWords[i];
+            String strippedWord = stripQuotes(strippedWords[i]);
 
             double difference = MessageUtils.getLevenshteinDistancePercent(strippedWord, match);
             if (1 - difference <= distanceThreshold) {
@@ -469,6 +470,16 @@ public class FilterTokenizer extends Tokenizer {
         return Settings.REMOVE_FILTERS.get() ?
                 List.of(new TokenizerResult(Token.empty(), start, match.length())) :
                 List.of();
+    }
+
+    private static String stripQuotes(String word) {
+        while (word.length() > 1 && isQuote(word.charAt(0)) && isQuote(word.charAt(word.length() - 1)))
+            word = word.substring(1, word.length() - 1);
+        return word;
+    }
+
+    private static boolean isQuote(char c) {
+        return c == '\"' || c == '\'' || c == '\u201C' || c == '\u201D' || c == '\u2018' || c == '\u2019' || c == '\u00AB' || c == '\u00BB';
     }
     
     private boolean checkToggled(TokenizerParams params, Filter filter) {
