@@ -18,6 +18,10 @@ public class ChatLogTask extends BukkitRunnable {
 
     private final ConsoleMessageLog log;
     private final File file;
+    // Serializes complete flushes: the repeating async task and save()'s
+    // synchronous run() can overlap, and two interleaved flushes would append
+    // batches out of order (or a failed older batch could retry after a newer one).
+    private final Object flushLock = new Object();
 
     public ChatLogTask(RoseChat plugin, ConsoleMessageLog log) throws IOException {
         this.log = log;
@@ -32,24 +36,26 @@ public class ChatLogTask extends BukkitRunnable {
 
     @Override
     public void run() {
-        // Snapshot under the log's lock, then write outside of it: chat
-        // handlers (main + async) add to this log concurrently, and
-        // iterating/clearing the live list raced with those adds.
-        List<String> snapshot;
-        synchronized (this.log.getMessages()) {
-            snapshot = new ArrayList<>(this.log.getMessages());
-            this.log.getMessages().clear();
-        }
-
-        try (FileWriter writer = new FileWriter(this.file, true)) {
-            for (String s : snapshot)
-                writer.write(s + "\n");
-        } catch (IOException e) {
-            e.printStackTrace();
-            Bukkit.getLogger().warning("An error occurred while writing the chat log.");
-            // Don't lose the batch: put it back at the front so the next run retries.
+        synchronized (this.flushLock) {
+            // Snapshot under the log's lock, then write outside of it: chat
+            // handlers (main + async) add to this log concurrently, and
+            // iterating/clearing the live list raced with those adds.
+            List<String> snapshot;
             synchronized (this.log.getMessages()) {
-                this.log.getMessages().addAll(0, snapshot);
+                snapshot = new ArrayList<>(this.log.getMessages());
+                this.log.getMessages().clear();
+            }
+
+            try (FileWriter writer = new FileWriter(this.file, true)) {
+                for (String s : snapshot)
+                    writer.write(s + "\n");
+            } catch (IOException e) {
+                e.printStackTrace();
+                Bukkit.getLogger().warning("An error occurred while writing the chat log.");
+                // Don't lose the batch: put it back at the front so the next run retries.
+                synchronized (this.log.getMessages()) {
+                    this.log.getMessages().addAll(0, snapshot);
+                }
             }
         }
     }
