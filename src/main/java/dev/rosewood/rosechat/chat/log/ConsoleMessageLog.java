@@ -1,6 +1,7 @@
 package dev.rosewood.rosechat.chat.log;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class ConsoleMessageLog {
@@ -8,7 +9,11 @@ public class ConsoleMessageLog {
     protected final List<String> messages;
 
     public ConsoleMessageLog() {
-        this.messages = new ArrayList<>();
+        // Chat can be dispatched from multiple threads (e.g. InteractiveChat's
+        // async redispatched events vs. main-thread chat), so the log must be
+        // thread-safe. Compound operations on callers must still synchronize
+        // on this list to be atomic.
+        this.messages = Collections.synchronizedList(new ArrayList<>());
     }
 
     public void addMessage(String message) {
@@ -16,17 +21,21 @@ public class ConsoleMessageLog {
     }
 
     public String getLastMessage() {
-        if (this.messages.isEmpty())
-            return null;
+        synchronized (this.messages) {
+            if (this.messages.isEmpty())
+                return null;
 
-        return this.messages.get(this.messages.size() - 1);
+            return this.messages.get(this.messages.size() - 1);
+        }
     }
 
     public void removeLastMessage() {
-        if (this.messages.isEmpty())
-            return;
+        synchronized (this.messages) {
+            if (this.messages.isEmpty())
+                return;
 
-        this.messages.remove(this.messages.size() - 1);
+            this.messages.remove(this.messages.size() - 1);
+        }
     }
 
     public List<String> getMessages() {
