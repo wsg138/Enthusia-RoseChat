@@ -30,27 +30,34 @@ public class PlayerMessageLog extends ConsoleMessageLog {
     public boolean addMessageWithSpamCheck(String messageToAdd) {
         // Refresh the cleanup amount, as it can be changed during a reload.
         this.cleanupAmount = Settings.SPAM_MESSAGE_COUNT.get();
-        this.addMessage(messageToAdd);
 
-        int similarMessages = 0;
+        // The add + similarity scan + trim must be atomic: this runs on both the
+        // main thread (regular chat) and async threads (InteractiveChat's
+        // redispatched AsyncPlayerChatEvent), so concurrent sends on the same
+        // log used to race -> ConcurrentModificationException on the subList trim.
+        synchronized (this.messages) {
+            this.addMessage(messageToAdd);
 
-        if (this.messages.size() > this.cleanupAmount - 1) {
-            for (int i = 0; i < this.cleanupAmount; i++) {
-                String message = this.messages.get((this.messages.size() - 1) - i);
-                double difference = MessageUtils.getLevenshteinDistancePercent(message, messageToAdd);
+            int similarMessages = 0;
 
-                if ((1 - difference) <= (Settings.SPAM_FILTER_SENSITIVITY.get() / 100))
-                    similarMessages++;
+            if (this.messages.size() > this.cleanupAmount - 1) {
+                for (int i = 0; i < this.cleanupAmount; i++) {
+                    String message = this.messages.get((this.messages.size() - 1) - i);
+                    double difference = MessageUtils.getLevenshteinDistancePercent(message, messageToAdd);
+
+                    if ((1 - difference) <= (Settings.SPAM_FILTER_SENSITIVITY.get() / 100))
+                        similarMessages++;
+                }
+
+                // Let's maybe not have an array size of... BIG.
+                if (this.messages.size() > this.cleanupAmount * 2)
+                    this.messages.subList(0, this.cleanupAmount).clear();
+
+                return similarMessages >= this.cleanupAmount;
             }
 
-            // Let's maybe not have an array size of... BIG.
-            if (this.messages.size() > this.cleanupAmount * 2)
-                this.messages.subList(0, this.cleanupAmount).clear();
-
-            return similarMessages >= this.cleanupAmount;
+            return false;
         }
-
-        return false;
     }
 
     public UUID getOwner() {
