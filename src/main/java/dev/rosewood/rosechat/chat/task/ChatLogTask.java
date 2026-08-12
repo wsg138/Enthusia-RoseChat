@@ -32,23 +32,25 @@ public class ChatLogTask extends BukkitRunnable {
 
     @Override
     public void run() {
-        try {
-            // Snapshot under the log's lock, then write outside of it: chat
-            // handlers (main + async) add to this log concurrently, and
-            // iterating/clearing the live list raced with those adds.
-            List<String> snapshot;
-            synchronized (this.log.getMessages()) {
-                snapshot = new ArrayList<>(this.log.getMessages());
-                this.log.getMessages().clear();
-            }
+        // Snapshot under the log's lock, then write outside of it: chat
+        // handlers (main + async) add to this log concurrently, and
+        // iterating/clearing the live list raced with those adds.
+        List<String> snapshot;
+        synchronized (this.log.getMessages()) {
+            snapshot = new ArrayList<>(this.log.getMessages());
+            this.log.getMessages().clear();
+        }
 
-            FileWriter writer = new FileWriter(this.file, true);
+        try (FileWriter writer = new FileWriter(this.file, true)) {
             for (String s : snapshot)
                 writer.write(s + "\n");
-            writer.close();
         } catch (IOException e) {
             e.printStackTrace();
             Bukkit.getLogger().warning("An error occurred while writing the chat log.");
+            // Don't lose the batch: put it back at the front so the next run retries.
+            synchronized (this.log.getMessages()) {
+                this.log.getMessages().addAll(0, snapshot);
+            }
         }
     }
 

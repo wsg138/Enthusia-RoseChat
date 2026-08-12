@@ -21,17 +21,21 @@ public class ConsoleMessageLog {
     }
 
     public String getLastMessage() {
-        if (this.messages.isEmpty())
-            return null;
+        synchronized (this.messages) {
+            if (this.messages.isEmpty())
+                return null;
 
-        return this.messages.get(this.messages.size() - 1);
+            return this.messages.get(this.messages.size() - 1);
+        }
     }
 
     public void removeLastMessage() {
-        if (this.messages.isEmpty())
-            return;
+        synchronized (this.messages) {
+            if (this.messages.isEmpty())
+                return;
 
-        this.messages.remove(this.messages.size() - 1);
+            this.messages.remove(this.messages.size() - 1);
+        }
     }
 
     public List<String> getMessages() {
