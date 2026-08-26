@@ -20,12 +20,19 @@ apply plugin: 'com.gradleup.shadow'
 group = 'dev.rosewood'
 version = 'RC-2'
 
+def lumaGuildsJar = file(System.getenv('LUMAGUILDS_JAR') ?: 'libs/LumaGuilds-2.1.0.jar')
+
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(21))
     disableAutoTargetJvm()
 }
 
 compileJava {
+    doFirst {
+        if (!lumaGuildsJar.isFile()) {
+            throw new GradleException('LumaGuilds jar not found. Set LUMAGUILDS_JAR or place it in libs/LumaGuilds-2.1.0.jar.')
+        }
+    }
     options.compilerArgs += ['-parameters']
     options.encoding = 'UTF-8'
 }
@@ -91,8 +98,16 @@ dependencies {
     compileOnly 'net.william278.husktowns:husktowns-bukkit:3.1.4'
     // LumaGuilds is not publicly available on a Maven repo. Drop the built jar into
     // libs/ from the LumaGuilds project (libs/ is gitignored).
-    compileOnly files('libs/LumaGuilds-2.1.0.jar')
+    compileOnly files(lumaGuildsJar)
     compileOnly 'org.jetbrains.kotlin:kotlin-stdlib:2.0.0'
+
+    testImplementation platform('org.junit:junit-bom:5.12.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
 }
 
 processResources {

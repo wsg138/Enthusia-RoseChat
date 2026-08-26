@@ -2,6 +2,7 @@ package dev.rosewood.rosechat.listener;
 
 import dev.rosewood.rosechat.RoseChat;
 import dev.rosewood.rosechat.api.RoseChatAPI;
+import dev.rosewood.rosechat.api.staff.PresenceType;
 import dev.rosewood.rosechat.chat.PlayerData;
 import dev.rosewood.rosechat.chat.channel.Channel;
 import dev.rosewood.rosechat.config.Settings;
@@ -105,6 +106,11 @@ public class PlayerListener implements Listener {
 
             // Includes the joining player — at NORMAL priority they are already in getOnlinePlayers().
             for (Player online : Bukkit.getOnlinePlayers()) {
+                if (this.plugin.getStaffService() != null
+                        && !this.plugin.getStaffService().canRenderPresence(
+                                joiningPlayer.getUUID(), online.getUniqueId(), PresenceType.JOIN))
+                    continue;
+
                 RosePlayer viewer = new RosePlayer(online);
                 List<String> lines = messageCondition.parseToStringList(
                         joiningPlayer, viewer, emptyPlaceholders);
@@ -142,6 +148,11 @@ public class PlayerListener implements Listener {
                 continue;
 
             for (Player online : Bukkit.getOnlinePlayers()) {
+                if (this.plugin.getStaffService() != null
+                        && !this.plugin.getStaffService().canRenderPresence(
+                                leavingPlayer.getUUID(), online.getUniqueId(), PresenceType.QUIT))
+                    continue;
+
                 RosePlayer viewer = new RosePlayer(online);
                 List<String> lines = messageCondition.parseToStringList(
                         leavingPlayer, viewer, emptyPlaceholders);

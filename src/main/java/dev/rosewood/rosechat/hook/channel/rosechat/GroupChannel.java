@@ -13,6 +13,7 @@ import dev.rosewood.rosechat.chat.channel.ChannelSettings;
 import dev.rosewood.rosechat.config.Settings;
 import dev.rosewood.rosechat.manager.GroupManager;
 import dev.rosewood.rosechat.message.PermissionArea;
+import dev.rosewood.rosechat.message.MessageDirection;
 import dev.rosewood.rosechat.message.RosePlayer;
 import dev.rosewood.rosechat.message.MessageRules;
 import dev.rosewood.rosechat.message.RoseMessage;
@@ -59,9 +60,27 @@ public class GroupChannel extends Channel {
         RoseMessage message = RoseMessage.forLocation(options.sender(), PermissionArea.GROUP);
         message.setPlaceholders(this.getInfoPlaceholders().build());
 
+        if (!options.bypassStaffBridge()
+                && RoseChat.getInstance().getStaffService() != null
+                && !RoseChat.getInstance().getStaffService()
+                        .allowChannelPreflight(options.sender(), this.getId(), options.message()))
+            return;
+
         // Apply the rules for this message or return if the message was blocked.
-        MessageRules rules = this.applyRules(message, options.message());
+        MessageRules rules;
+        if (options.bypassMessageRules()) {
+            message.setPlayerInput(options.message());
+            rules = new MessageRules();
+        } else {
+            rules = this.applyRules(message, options.message());
+        }
         if (rules == null)
+            return;
+
+        if (!options.bypassStaffBridge()
+                && RoseChat.getInstance().getStaffService() != null
+                && !RoseChat.getInstance().getStaffService()
+                        .allowChannelDispatch(message, this.getId(), MessageDirection.PLAYER_TO_SERVER))
             return;
 
         String format = options.format() != null ? options.format() : this.getSettings().getFormats().get("chat");
@@ -74,6 +93,11 @@ public class GroupChannel extends Channel {
         for (RosePlayer member : members) {
             // Check if the player can receive the message.
             if (!this.canPlayerReceiveMessage(message.getSender(), member))
+                continue;
+
+            if (RoseChat.getInstance().getStaffService() != null
+                    && !RoseChat.getInstance().getStaffService()
+                            .canReceiveChannelMessage(message, member, this.getId()))
                 continue;
 
             RoseChat.MESSAGE_THREAD_POOL.execute(() ->
@@ -91,6 +115,10 @@ public class GroupChannel extends Channel {
                 continue;
 
             RosePlayer rosePlayer = new RosePlayer(player);
+            if (RoseChat.getInstance().getStaffService() != null
+                    && !RoseChat.getInstance().getStaffService()
+                            .canReceiveChannelMessage(message, rosePlayer, this.getId()))
+                continue;
             RoseChat.MESSAGE_THREAD_POOL.execute(() ->
                     rosePlayer.send(message.parse(rosePlayer, Settings.GROUP_SPY_FORMAT.get())));
         }

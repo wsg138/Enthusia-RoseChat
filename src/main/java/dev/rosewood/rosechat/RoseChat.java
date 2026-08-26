@@ -1,6 +1,7 @@
 package dev.rosewood.rosechat;
 
 import dev.rosewood.rosechat.api.RoseChatAPI;
+import dev.rosewood.rosechat.api.staff.RoseChatStaffService;
 import dev.rosewood.rosechat.chat.log.ConsoleMessageLog;
 import dev.rosewood.rosechat.chat.task.ChatLogTask;
 import dev.rosewood.rosechat.config.Settings;
@@ -44,6 +45,7 @@ import dev.rosewood.rosechat.manager.LocaleManager;
 import dev.rosewood.rosechat.manager.PlaceholderManager;
 import dev.rosewood.rosechat.manager.PlayerDataManager;
 import dev.rosewood.rosechat.message.tokenizer.filter.HeldItemTokenizer;
+import dev.rosewood.rosechat.staff.RoseChatStaffServiceImpl;
 import dev.rosewood.rosegarden.RosePlugin;
 import dev.rosewood.rosegarden.config.SettingHolder;
 import dev.rosewood.rosegarden.hook.PlaceholderAPIHook;
@@ -62,6 +64,7 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.RegisteredServiceProvider;
+import org.bukkit.plugin.ServicePriority;
 
 public class RoseChat extends RosePlugin {
 
@@ -73,6 +76,7 @@ public class RoseChat extends RosePlugin {
     private ChatListener chatListener;
     private ConsoleMessageLog consoleLog;
     private ChatLogTask chatLogTask;
+    private RoseChatStaffServiceImpl staffService;
 
     public RoseChat() {
         super(-1, 5608,
@@ -106,6 +110,14 @@ public class RoseChat extends RosePlugin {
         this.getServer().getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
         this.getServer().getMessenger().registerIncomingPluginChannel(this, "BungeeCord",
                 new BungeeListener(this));
+
+        this.staffService = new RoseChatStaffServiceImpl(this);
+        this.getServer().getServicesManager().register(
+                RoseChatStaffService.class,
+                this.staffService,
+                this,
+                ServicePriority.Normal
+        );
 
         new HeldItemTokenizer();
     }
@@ -166,6 +178,12 @@ public class RoseChat extends RosePlugin {
 
     @Override
     public void disable() {
+        if (this.staffService != null) {
+            this.getServer().getServicesManager().unregister(RoseChatStaffService.class, this.staffService);
+            this.staffService.close();
+            this.staffService = null;
+        }
+
         this.getServer().getMessenger().unregisterOutgoingPluginChannel(this);
         this.getServer().getMessenger().unregisterIncomingPluginChannel(this);
 
@@ -275,6 +293,10 @@ public class RoseChat extends RosePlugin {
 
     public ConsoleMessageLog getConsoleLog() {
         return this.consoleLog;
+    }
+
+    public RoseChatStaffServiceImpl getStaffService() {
+        return this.staffService;
     }
 
     @Override

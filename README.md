@@ -6,6 +6,9 @@ RoseChat is a chat plugin that allows you to format chat with channels, colors, 
 ### Documentation
 Any and all information you need for the plugin should already be included [in our Wiki](https://github.com/Rosewood-Development/RoseChat/wiki)!
 
+### EnthusiaStaff Integration
+This fork provides a versioned Bukkit service for staff-channel control, moderation checks, private-message capture, and vanish-safe message visibility. The API is implemented and packaged by RoseChat so consuming plugins can keep the contract compile-only and avoid duplicate runtime classes. See [the staff bridge guide](docs/enthusia-staff-bridge.md) for the API lifecycle and build checks.
+
 ### Support
 If there's anything we left out, you have a question, you want to report a bug, or anything else, please [join our Discord server](https://discord.gg/MgUsTBK).  We offer any and all support in our server.
 

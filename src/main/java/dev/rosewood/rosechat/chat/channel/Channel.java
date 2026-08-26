@@ -234,7 +234,7 @@ public abstract class Channel {
      * @return True if the message has been handled and slow mode is enabled.
      */
     protected boolean handleSlowmode(ChannelMessageOptions options) {
-        if (this.slowmodeTask != null && !options.bypassSlowmode()
+        if (this.slowmodeTask != null && options.sender() != null && !options.bypassSlowmode()
                 && !options.sender().hasPermission("rosechat.slowmode.bypass." + this.getId())) {
             this.messageLog.addMessage(options);
             return true;
