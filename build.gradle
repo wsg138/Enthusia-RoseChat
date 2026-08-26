@@ -27,12 +27,13 @@ java {
     disableAutoTargetJvm()
 }
 
-compileJava {
-    doFirst {
-        if (!lumaGuildsJar.isFile()) {
-            throw new GradleException('LumaGuilds jar not found. Set LUMAGUILDS_JAR or place it in libs/LumaGuilds-2.1.0.jar.')
-        }
+sourceSets {
+    lumaGuildsApi {
+        java.srcDir 'src/lumaGuildsApi/java'
     }
+}
+
+compileJava {
     options.compilerArgs += ['-parameters']
     options.encoding = 'UTF-8'
 }
@@ -98,7 +99,11 @@ dependencies {
     compileOnly 'net.william278.husktowns:husktowns-bukkit:3.1.4'
     // LumaGuilds is not publicly available on a Maven repo. Drop the built jar into
     // libs/ from the LumaGuilds project (libs/ is gitignored).
-    compileOnly files(lumaGuildsJar)
+    if (lumaGuildsJar.isFile()) {
+        compileOnly files(lumaGuildsJar)
+    } else {
+        compileOnly sourceSets.lumaGuildsApi.output
+    }
     compileOnly 'org.jetbrains.kotlin:kotlin-stdlib:2.0.0'
 
     testImplementation platform('org.junit:junit-bom:5.12.2')

@@ -28,7 +28,7 @@ Private messages are captured only after the target delivery succeeds. Incoming 
 
 ## Building
 
-RoseChat requires Java 21. LumaGuilds is a compile-only dependency and is not available from a public Maven repository. Put its jar at `libs/LumaGuilds-2.1.0.jar`, or provide an absolute path through `LUMAGUILDS_JAR` for the build process.
+RoseChat requires Java 21. LumaGuilds is a compile-only dependency and is not available from a public Maven repository. Normal builds use the checked-in minimal compile contract under `src/lumaGuildsApi`; those classes are never packaged. To validate against a complete LumaGuilds build, put its jar at `libs/LumaGuilds-2.1.0.jar` or provide its path through `LUMAGUILDS_JAR`.
 
 Run the complete local check with:
 
