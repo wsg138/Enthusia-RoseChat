@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - section/staff-bridge-api
   pull_request:
     branches:
       - master
