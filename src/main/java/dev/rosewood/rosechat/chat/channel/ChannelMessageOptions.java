@@ -6,7 +6,8 @@ import java.util.UUID;
 
 public record ChannelMessageOptions(RosePlayer sender, String message, String format,
                                     boolean sendToDiscord, String discordId, UUID messageId,
-                                    boolean isJson, RoseMessage wrapper, boolean bypassSlowmode) {
+                                    boolean isJson, RoseMessage wrapper, boolean bypassSlowmode,
+                                    boolean bypassStaffBridge, boolean bypassMessageRules) {
 
     public static class Builder {
 
@@ -19,6 +20,8 @@ public record ChannelMessageOptions(RosePlayer sender, String message, String fo
         private boolean isJson;
         private RoseMessage wrapper;
         private boolean bypassSlowmode;
+        private boolean bypassStaffBridge;
+        private boolean bypassMessageRules;
 
         public Builder sender(RosePlayer sender) {
             this.sender = sender;
@@ -65,9 +68,20 @@ public record ChannelMessageOptions(RosePlayer sender, String message, String fo
             return this;
         }
 
+        public Builder bypassStaffBridge(boolean bypassStaffBridge) {
+            this.bypassStaffBridge = bypassStaffBridge;
+            return this;
+        }
+
+        public Builder bypassMessageRules(boolean bypassMessageRules) {
+            this.bypassMessageRules = bypassMessageRules;
+            return this;
+        }
+
         public ChannelMessageOptions build() {
             return new ChannelMessageOptions(this.sender, this.message, this.format, this.sendToDiscord, this.discordId,
-                    this.messageId, this.isJson, this.wrapper, this.bypassSlowmode);
+                    this.messageId, this.isJson, this.wrapper, this.bypassSlowmode, this.bypassStaffBridge,
+                    this.bypassMessageRules);
         }
 
     }

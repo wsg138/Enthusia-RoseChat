@@ -231,7 +231,7 @@ public class BungeeManager extends Manager {
         if (playerData.getIgnoringPlayers().contains(senderUUID))
             return;
 
-        RosePlayer sender = new RosePlayer(senderStr, group);
+        RosePlayer sender = new RosePlayer(senderUUID, senderStr, group);
         sender.setIgnoredPermissions(permissions);
         if (json == null || json.isEmpty())
             MessageUtils.sendPrivateMessage(sender, player.getName(), message);

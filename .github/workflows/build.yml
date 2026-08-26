@@ -1,0 +1,76 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rosechat-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out RoseChat
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up Java 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Build and test RoseChat
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon clean test shadowJar
+
+      - name: Verify test execution
+        shell: python
+        run: |
+          import pathlib
+          import sys
+          import xml.etree.ElementTree as ET
+
+          reports = list(pathlib.Path('build/test-results/test').glob('TEST-*.xml'))
+          totals = {'tests': 0, 'skipped': 0, 'failures': 0, 'errors': 0}
+          for report in reports:
+              suite = ET.parse(report).getroot()
+              for key in totals:
+                  totals[key] += int(suite.attrib.get(key, 0))
+          print(totals)
+          if not reports or totals['tests'] < 10 or any(totals[key] for key in ('skipped', 'failures', 'errors')):
+              sys.exit('Expected all ten staff bridge tests to execute and pass')
+
+      - name: Verify provider packaging
+        shell: bash
+        run: |
+          jar_path=$(find build/libs -maxdepth 1 -type f -name 'RoseChat-*.jar' | head -n 1)
+          jar tf "$jar_path" > jar-entries.txt
+          api_count=$(grep -c '^dev/rosewood/rosechat/api/staff/.*\.class$' jar-entries.txt)
+          if [[ "$api_count" -ne 15 ]]; then
+            echo "Expected 15 staff API class entries, found $api_count" >&2
+            exit 1
+          fi
+          if grep -Eq '^(net/enthusia/staff|org/bukkit|net/lumalyte/lg)/' jar-entries.txt; then
+            echo "The provider jar contains a consumer or server API class" >&2
+            exit 1
+          fi
+
+      - name: Upload RoseChat jar
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: RoseChat
+          path: build/libs/RoseChat-*.jar
+          if-no-files-found: error

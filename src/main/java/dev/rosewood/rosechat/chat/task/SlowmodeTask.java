@@ -41,6 +41,8 @@ public class SlowmodeTask extends BukkitRunnable {
                 .isJson(options.isJson())
                 .wrapper(options.wrapper())
                 .bypassSlowmode(true)
+                .bypassStaffBridge(options.bypassStaffBridge())
+                .bypassMessageRules(options.bypassMessageRules())
                 .build();
         this.channel.send(options);
     }

@@ -191,6 +191,9 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
             message.setUUID(options.messageId());
             message.setPlaceholders(this.getInfoPlaceholders().build());
 
+            if (!this.passesStaffPreflight(options, message))
+                return;
+
             if (options.isJson()) {
                 this.send(options, message, MessageDirection.SERVER_TO_SERVER_RAW, new MessageRules());
             } else {
@@ -204,6 +207,8 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
 
         // This message is likely sent from discord to minecraft.
         if (options.wrapper() != null) {
+            if (!this.passesStaffPreflight(options, options.wrapper()))
+                return;
             this.send(options, options.wrapper(), MessageDirection.DISCORD_TO_MINECRAFT, new MessageRules());
             return;
         }
@@ -234,8 +239,17 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
         RoseMessage message = RoseMessage.forChannel(options.sender(), this);
         message.setPlaceholders(this.getInfoPlaceholders().build());
 
+        if (!this.passesStaffPreflight(options, message))
+            return;
+
         // Apply the rules for this message or return if the message was blocked.
-        MessageRules rules = this.applyRules(message, options.message());
+        MessageRules rules;
+        if (options.bypassMessageRules()) {
+            message.setPlayerInput(options.message());
+            rules = new MessageRules();
+        } else {
+            rules = this.applyRules(message, options.message());
+        }
         if (rules == null)
             return;
 
@@ -248,6 +262,11 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
                               String format, String discordId) {
         // Don't send the message if the receiver can't receive it.
         if (!this.canPlayerReceiveMessage(message.getSender(), receiver))
+            return;
+
+        if (RoseChat.getInstance().getStaffService() != null
+                && !RoseChat.getInstance().getStaffService()
+                        .canReceiveChannelMessage(message, receiver, this.getId()))
             return;
 
         // Send the message to the player asynchronously.
@@ -523,6 +542,12 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
     }
 
     private void send(ChannelMessageOptions options, RoseMessage message, MessageDirection direction, MessageRules rules) {
+        if (!options.bypassStaffBridge()
+                && RoseChat.getInstance().getStaffService() != null
+                && !RoseChat.getInstance().getStaffService()
+                        .allowChannelDispatch(message, this.getId(), direction))
+            return;
+
         // Use the format provided in the options if found, or use the "chat" format in the channel settings.
         String format = options.format() != null ? options.format() : this.getSettings().getFormats().get("chat");
 
@@ -544,6 +569,14 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
         } else {
             this.sendToChannelMembers(message, direction, format, options.discordId());
         }
+    }
+
+    private boolean passesStaffPreflight(ChannelMessageOptions options, RoseMessage message) {
+        String input = message.getPlayerInput() == null ? options.message() : message.getPlayerInput();
+        return options.bypassStaffBridge()
+                || RoseChat.getInstance().getStaffService() == null
+                || RoseChat.getInstance().getStaffService().allowChannelPreflight(
+                        message.getSender(), this.getId(), input);
     }
 
     // Send String Functions
