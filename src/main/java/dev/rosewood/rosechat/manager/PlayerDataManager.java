@@ -89,16 +89,17 @@ public class PlayerDataManager extends Manager {
         this.playerData.remove(uuid);
     }
 
+    /**
+     * Ignore toggles are intentionally persisted before returning. These writes are tiny and
+     * infrequent; keeping them synchronous prevents a server shutdown immediately after /ignore
+     * from cancelling the queued database task and losing the player's choice.
+     */
     public void addIgnore(UUID ignoring, UUID ignored) {
-        Bukkit.getScheduler().runTaskAsynchronously(this.rosePlugin, () -> {
-            this.dataManager.addIgnore(ignoring, ignored);
-        });
+        this.dataManager.addIgnore(ignoring, ignored);
     }
 
     public void removeIgnore(UUID ignoring, UUID ignored) {
-        Bukkit.getScheduler().runTaskAsynchronously(this.rosePlugin, () -> {
-            this.dataManager.removeIgnore(ignoring, ignored);
-        });
+        this.dataManager.removeIgnore(ignoring, ignored);
     }
 
     public void hideChannel(UUID uuid, String channel) {
