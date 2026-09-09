@@ -93,27 +93,38 @@ public class DataManager extends AbstractDataManager {
                 }
             }
 
-            String ignoreQuery = "SELECT * FROM " + this.getTablePrefix() + "player_data_ignore WHERE ignoring_uuid = ?";
+            // Older RoseChat builds could re-insert an ignore while merely loading it, so legacy
+            // databases may contain duplicate rows. DISTINCT keeps that historical duplication from
+            // leaking into the in-memory ignore list.
+            String ignoreQuery = "SELECT DISTINCT ignored_uuid FROM " + this.getTablePrefix()
+                    + "player_data_ignore WHERE ignoring_uuid = ?";
             try (PreparedStatement statement = connection.prepareStatement(ignoreQuery)) {
                 statement.setString(1, uuid.toString());
                 ResultSet result = statement.executeQuery();
 
-                // Restore every persisted ignore. Do not call PlayerData#ignore here: that method is
-                // for a new user action and writes to the database, which would re-insert rows while
-                // merely loading them after a restart.
                 while (result.next()) {
                     UUID ignored = UUID.fromString(result.getString("ignored_uuid"));
-                    playerData.getIgnoringPlayers().add(ignored);
+                    if (!playerData.getIgnoringPlayers().contains(ignored)) {
+                        // Load persisted state directly. PlayerData#ignore is a user-action method
+                        // and would write the same relationship back to the database during startup.
+                        playerData.getIgnoringPlayers().add(ignored);
+                    }
                 }
             }
 
-            String channelsQuery = "SELECT * FROM " + this.getTablePrefix() + "hidden_channels WHERE uuid = ?";
+            // Hidden channels had the same load-time write-back pattern as ignores. Load every
+            // distinct persisted channel directly so restart behavior is complete and side-effect free.
+            String channelsQuery = "SELECT DISTINCT channel FROM " + this.getTablePrefix()
+                    + "hidden_channels WHERE uuid = ?";
             try (PreparedStatement statement = connection.prepareStatement(channelsQuery)) {
                 statement.setString(1, uuid.toString());
                 ResultSet result = statement.executeQuery();
 
-                if (result.next()) {
-                    playerData.hideChannel(result.getString("channel"));
+                while (result.next()) {
+                    String channel = result.getString("channel");
+                    if (!playerData.getHiddenChannels().contains(channel)) {
+                        playerData.getHiddenChannels().add(channel);
+                    }
                 }
             }
 
@@ -360,7 +371,7 @@ public class DataManager extends AbstractDataManager {
             try (PreparedStatement statement = connection.prepareStatement(membersQuery)) {
                 statement.setString(1, id);
                 ResultSet result = statement.executeQuery();
-                if (result.next())
+                while (result.next())
                     groupChatMembers.add(UUID.fromString(result.getString("uuid")));
             }
         });

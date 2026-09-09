@@ -18,7 +18,7 @@ plugins {
 apply plugin: 'com.gradleup.shadow'
 
 group = 'dev.rosewood'
-version = 'RC-2'
+version = 'RC-3'
 
 def lumaGuildsJar = file(System.getenv('LUMAGUILDS_JAR') ?: 'libs/LumaGuilds-2.1.0.jar')
 
