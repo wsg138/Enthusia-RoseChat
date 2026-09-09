@@ -290,7 +290,7 @@ public class DataManager extends AbstractDataManager {
 
     public List<GroupChannel> getMemberGroupChats(UUID member) {
         List<GroupChannel> groupChats = new ArrayList<>();
-        this.databaseConnector.connect(connection -> {
+        this.getDatabaseConnector().connect(connection -> {
             String groupQuery = "SELECT gc.id, gc.name, gc.owner, gcm.uuid AS member_uuid FROM " + this.getTablePrefix() + "group_chat_member gcm JOIN " +
                     this.getTablePrefix() + "group_chat gc ON gc.id = gcm.group_chat WHERE gc.id IN " +
                     "(SELECT group_chat FROM " + this.getTablePrefix() + "group_chat_member WHERE uuid = ?) ORDER BY id;";
