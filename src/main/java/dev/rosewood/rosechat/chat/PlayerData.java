@@ -222,7 +222,7 @@ public class PlayerData {
     }
 
     /**
-     * @param color The chat color of the player.
+     * @param color The chat color for the player.
      */
     public void setColor(String color) {
         this.color = color;
@@ -241,7 +241,7 @@ public class PlayerData {
     }
 
     /**
-     * Sets the current nickname that the player is using.
+     * Sets the current nickname of the player.
      * @param nickname The nickname to use.
      */
     public void setNickname(String nickname) {
