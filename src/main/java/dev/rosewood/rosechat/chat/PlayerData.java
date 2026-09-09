@@ -222,7 +222,7 @@ public class PlayerData {
     }
 
     /**
-     * @param color The chat color for the player.
+     * @param color The chat color of the player.
      */
     public void setColor(String color) {
         this.color = color;
@@ -241,7 +241,7 @@ public class PlayerData {
     }
 
     /**
-     * Sets the current nickname of the player.
+     * Sets the current nickname that the player is using.
      * @param nickname The nickname to use.
      */
     public void setNickname(String nickname) {
@@ -415,7 +415,7 @@ public class PlayerData {
 
     /**
      * Updates the active channel, where the next message should go.
-     * @param activeChannel The channel that the next message should go.
+     * @param activeChannel The channel that the next message should be sent to.
      */
     public void setActiveChannel(Channel activeChannel) {
         this.activeChannel = activeChannel;
