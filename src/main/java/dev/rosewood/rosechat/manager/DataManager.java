@@ -247,7 +247,7 @@ public class DataManager extends AbstractDataManager {
     public void saveChannelSettings(Channel channel) {
         this.databaseConnector.connect(connection -> {
             String insertQuery = "REPLACE INTO " + this.getTablePrefix() + "channel_settings (id, muted, slowmode) " +
-                    "VALUES(?, ?)";
+                    "VALUES(?, ?, ?)";
             try (PreparedStatement statement = connection.prepareStatement(insertQuery)) {
                 statement.setString(1, channel.getId());
                 statement.setBoolean(2, channel.isMuted());
