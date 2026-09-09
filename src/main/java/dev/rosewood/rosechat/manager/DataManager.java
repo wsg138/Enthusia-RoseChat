@@ -98,9 +98,12 @@ public class DataManager extends AbstractDataManager {
                 statement.setString(1, uuid.toString());
                 ResultSet result = statement.executeQuery();
 
-                if (result.next()) {
+                // Restore every persisted ignore. Do not call PlayerData#ignore here: that method is
+                // for a new user action and writes to the database, which would re-insert rows while
+                // merely loading them after a restart.
+                while (result.next()) {
                     UUID ignored = UUID.fromString(result.getString("ignored_uuid"));
-                    playerData.ignore(ignored);
+                    playerData.getIgnoringPlayers().add(ignored);
                 }
             }
 
