@@ -18,7 +18,7 @@ plugins {
 apply plugin: 'com.gradleup.shadow'
 
 group = 'dev.rosewood'
-version = 'RC-3'
+version = 'RC-4'
 
 def lumaGuildsJar = file(System.getenv('LUMAGUILDS_JAR') ?: 'libs/LumaGuilds-2.1.0.jar')
 
@@ -108,6 +108,9 @@ dependencies {
 
     testImplementation platform('org.junit:junit-bom:5.12.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT', {
+        exclude group: 'net.md-5'
+    }
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 

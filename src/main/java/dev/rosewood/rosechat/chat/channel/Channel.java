@@ -12,11 +12,11 @@ import dev.rosewood.rosechat.message.RosePlayer;
 import dev.rosewood.rosechat.message.MessageRules;
 import dev.rosewood.rosechat.message.RoseMessage;
 import dev.rosewood.rosegarden.utils.StringPlaceholders;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
@@ -25,7 +25,7 @@ import org.bukkit.entity.Player;
 public abstract class Channel {
 
     private final ChannelProvider provider;
-    protected final List<UUID> members;
+    protected final CopyOnWriteArrayList<UUID> members;
     protected final ChannelMessageLog messageLog;
     protected String id;
     protected ChannelSettings settings;
@@ -34,7 +34,7 @@ public abstract class Channel {
     private int slowmodeSpeed;
 
     public Channel(ChannelProvider provider) {
-        this.members = new ArrayList<>();
+        this.members = new CopyOnWriteArrayList<>();
         this.provider = provider;
         this.messageLog = new ChannelMessageLog();
     }
@@ -97,7 +97,7 @@ public abstract class Channel {
      * @param player The {@link RosePlayer} who is joining the channel.
      */
     public void onJoin(RosePlayer player) {
-        this.members.add(player.getUUID());
+        this.members.addIfAbsent(player.getUUID());
     }
 
     /**
