@@ -78,69 +78,83 @@ dependencies {
     compileOnly 'com.discordsrv:discordsrv:1.27.0'
     compileOnly 'net.dv8tion:JDA:4.3.0_349'
     compileOnly 'com.comphenix.protocol:ProtocolLib:5.0.0-SNAPSHOT'
-    compileOnly 'net.luckperms:api:5.4'
-    compileOnly 'com.palmergames.bukkit.towny:towny:0.99.6.0'
-    compileOnly 'com.gmail.nossr50.mcMMO:mcMMO:2.1.206'
-    compileOnly 'com.sk89q.worldguard:worldguard-bukkit:7.0.12'
-    compileOnly 'com.sk89q.worldedit:worldedit-bukkit:7.3.12'
+
+    // Plugin Support
+    compileOnly 'com.palmergames.bukkit.towny:towny:0.100.3.0'
+    compileOnly 'com.gmail.nossr50.mcMMO:mcMMO:2.2.012'
+    compileOnly 'com.sk89q.worldguard:worldguard-bukkit:7.0.0', {
+        exclude group: 'org.bukkit'
+    }
+    compileOnly 'com.sk89q.worldedit:worldedit-bukkit:7.3.0'
     compileOnly 'net.sacredlabyrinth.phaed.simpleclans:SimpleClans:2.19.2'
-    compileOnly 'com.massivecraft:Factions:1.6.9.5-U0.7.5'
-    compileOnly 'org.kingdoms:kingdoms:1.16.10.0.2-BETA'
-    compileOnly 'world.bentobox:bentobox:2.7.0-SNAPSHOT'
-    compileOnly 'com.bgsoftware:SuperiorSkyblockAPI:1.11.1'
-    compileOnly 'com.iridium:IridiumSkyblock:3.2.10'
-    compileOnly 'com.songoda:FabledSkyBlock:3.0.0'
-    compileOnly 'at.pcgamingfreaks:MarriageMaster-API:2.7.5'
-    compileOnly 'com.loohp:InteractiveChat:4.2.17.0'
-    compileOnly 'net.william278:HuskTowns:3.0.6'
-    compileOnly 'org.jetbrains:annotations:24.1.0'
+    compileOnly 'com.massivecraft:Factions:1.6.9.5-U0.6.29'
+    compileOnly 'com.github.cryptomorin:kingdoms:1.16.3.3'
+    compileOnly 'world.bentobox:bentobox:2.3.0-SNAPSHOT'
+    compileOnly 'com.bgsoftware:SuperiorSkyblockAPI:2024.1'
+    compileOnly 'com.songoda:skyblock:2.5.0'
+    compileOnly 'at.pcgamingfreaks:MarriageMaster-API-Bukkit:2.7.5'
+    compileOnly 'net.essentialsx:EssentialsX:2.20.1', {
+        exclude group: 'org.spigotmc'
+    }
+    compileOnly 'net.william278.husktowns:husktowns-bukkit:3.1.4'
+    // LumaGuilds is not publicly available on a Maven repo. Drop the built jar into
+    // libs/ from the LumaGuilds project (libs/ is gitignored).
+    if (lumaGuildsJar.isFile()) {
+        compileOnly files(lumaGuildsJar)
+    } else {
+        compileOnly sourceSets.lumaGuildsApi.output
+    }
+    compileOnly 'org.jetbrains.kotlin:kotlin-stdlib:2.0.0'
 
-    compileOnly 'net.essentialsx:EssentialsX:2.20.1'
-    compileOnly 'net.essentialsx:EssentialsXChat:2.20.1'
-
-    compileOnly files(lumaGuildsJar)
-
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.4'
+    testImplementation platform('org.junit:junit-bom:5.12.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
-tasks.named('test') {
+tasks.withType(Test).configureEach {
     useJUnitPlatform()
 }
 
-tasks.named('compileLumaGuildsApiJava') {
-    enabled = !lumaGuildsJar.exists()
-}
-
-tasks.named('compileJava') {
-    if (lumaGuildsJar.exists()) {
-        classpath += files(lumaGuildsJar)
-    } else {
-        classpath += sourceSets.lumaGuildsApi.output
+processResources {
+    from (sourceSets.main.resources.srcDirs) {
+        include '**/*.yml'
+        filter ReplaceTokens, tokens: ["version": project.property("version")]
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
     }
 }
 
-processResources {
-    filter ReplaceTokens, tokens: [version: version]
-}
-
 shadowJar {
-    archiveClassifier.set('')
-    relocate 'org.bstats', 'dev.rosewood.rosechat.lib.bstats'
-    relocate 'org.apache.commons.text', 'dev.rosewood.rosechat.lib.apache.commons.text'
-}
-
-jar {
-    enabled = false
+    archiveClassifier.set(null);
+    relocate('dev.rosewood.rosegarden', 'dev.rosewood.rosechat.lib.rosegarden')
+    relocate('org.apache', 'dev.rosewood.rosechat.lib.apache')
+    minimize()
 }
 
 publishing {
     publications {
-        shadow(MavenPublication) {
-            artifact shadowJar
-            groupId = project.group
-            artifactId = 'rosechat'
-            version = project.version
+        shadow(MavenPublication) { publication ->
+            project.shadow.component(publication)
+            artifactId = rootProject.name.toLowerCase()
+            pom {
+                name = rootProject.name.toLowerCase()
+            }
+        }
+    }
+    repositories {
+        if (project.hasProperty('mavenUser') && project.hasProperty('mavenPassword')) {
+            maven {
+                credentials {
+                    username = project.mavenUser
+                    password = project.mavenPassword
+                }
+
+                def releasesRepoUrl = 'https://repo.rosewooddev.io/repository/public-releases/'
+                def snapshotsRepoUrl = 'https://repo.rosewooddev.io/repository/public-snapshots/'
+                url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+            }
         }
     }
 }
+
+build.dependsOn shadowJar
+generateMetadataFileForShadowPublication.dependsOn jar
