@@ -98,9 +98,12 @@ public class DataManager extends AbstractDataManager {
                 statement.setString(1, uuid.toString());
                 ResultSet result = statement.executeQuery();
 
-                if (result.next()) {
+                // Restore every persisted ignore. Do not call PlayerData#ignore here: that method is
+                // for a new user action and writes to the database, which would re-insert rows while
+                // merely loading them after a restart.
+                while (result.next()) {
                     UUID ignored = UUID.fromString(result.getString("ignored_uuid"));
-                    playerData.ignore(ignored);
+                    playerData.getIgnoringPlayers().add(ignored);
                 }
             }
 
@@ -244,7 +247,7 @@ public class DataManager extends AbstractDataManager {
     public void saveChannelSettings(Channel channel) {
         this.databaseConnector.connect(connection -> {
             String insertQuery = "REPLACE INTO " + this.getTablePrefix() + "channel_settings (id, muted, slowmode) " +
-                    "VALUES(?, ?, ?)";
+                    "VALUES(?, ?)";
             try (PreparedStatement statement = connection.prepareStatement(insertQuery)) {
                 statement.setString(1, channel.getId());
                 statement.setBoolean(2, channel.isMuted());
