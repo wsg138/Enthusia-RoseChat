@@ -286,21 +286,27 @@ public class PlayerData {
     }
 
     /**
-     * Ignores a player.
+     * Ignores a player. The in-memory relationship is idempotent so duplicate command/API calls
+     * cannot create duplicate entries that would make a later unignore appear ineffective.
      * @param target The player to ignore.
      */
-    public void ignore(UUID target) {
+    public synchronized void ignore(UUID target) {
+        if (this.ignoringPlayers.contains(target))
+            return;
+
         this.ignoringPlayers.add(target);
         this.api.getPlayerDataManager().addIgnore(this.getUUID(), target);
     }
 
     /**
-     * Stops ignoring a player.
+     * Stops ignoring a player. Remove every historical duplicate from memory; the database delete
+     * already removes every matching persisted row.
      * @param target The player to stop ignoring.
      */
-    public void unignore(UUID target) {
-        this.ignoringPlayers.remove(target);
-        this.api.getPlayerDataManager().removeIgnore(this.getUUID(), target);
+    public synchronized void unignore(UUID target) {
+        boolean removed = this.ignoringPlayers.removeIf(target::equals);
+        if (removed)
+            this.api.getPlayerDataManager().removeIgnore(this.getUUID(), target);
     }
 
     /**
@@ -360,7 +366,10 @@ public class PlayerData {
      * Hides a channel from the player.
      * @param channel The channel to hide.
      */
-    public void hideChannel(String channel) {
+    public synchronized void hideChannel(String channel) {
+        if (this.hiddenChannels.contains(channel))
+            return;
+
         this.hiddenChannels.add(channel);
         this.api.getPlayerDataManager().hideChannel(this.getUUID(), channel);
     }
@@ -369,9 +378,10 @@ public class PlayerData {
      * Shows a channel to the player.
      * @param channel The channel to show.
      */
-    public void showChannel(String channel) {
-        this.hiddenChannels.remove(channel);
-        this.api.getPlayerDataManager().showChannel(this.getUUID(), channel);
+    public synchronized void showChannel(String channel) {
+        boolean removed = this.hiddenChannels.removeIf(channel::equals);
+        if (removed)
+            this.api.getPlayerDataManager().showChannel(this.getUUID(), channel);
     }
 
     /**
@@ -405,7 +415,7 @@ public class PlayerData {
 
     /**
      * Updates the active channel, where the next message should go.
-     * @param activeChannel The channel that the next message should be sent to.
+     * @param activeChannel The channel that the next message should go.
      */
     public void setActiveChannel(Channel activeChannel) {
         this.activeChannel = activeChannel;
