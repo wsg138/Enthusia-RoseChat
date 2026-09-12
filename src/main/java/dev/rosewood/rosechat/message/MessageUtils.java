@@ -33,7 +33,6 @@ import net.md_5.bungee.chat.VersionedComponentSerializer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.metadata.MetadataValue;
 
@@ -65,6 +64,7 @@ public class MessageUtils {
         } catch (ClassNotFoundException ignored) { }
         HAS_VERSIONED_SERIALIZER = versioned;
     }
+
     /**
      * Removes the accents from a string.
      * @param string The string to use.
@@ -181,6 +181,9 @@ public class MessageUtils {
             }
         }
 
+        if (target != null && !canReceiveLocalPrivateMessage(sender, target))
+            return;
+
         RoseMessage roseMessage = RoseMessage.forLocation(sender, PermissionArea.MESSAGE);
 
         RoseChatStaffServiceImpl staffService = RoseChat.getInstance().getStaffService();
@@ -212,17 +215,6 @@ public class MessageUtils {
             }
 
             return;
-        }
-
-        // If the message was sent by a player, check if the receiver is ignoring them.
-        if (sender.isPlayer()) {
-            OfflinePlayer offlineTarget = Bukkit.getOfflinePlayer(targetName);
-            PlayerData targetData = RoseChatAPI.getInstance().getPlayerData(offlineTarget.getUniqueId());
-
-            if (targetData != null && targetData.getIgnoringPlayers().contains(sender.getUUID())) {
-                sender.sendLocaleMessage("command-togglemessage-cannot-message");
-                return;
-            }
         }
 
         String deliveredMessage = roseMessage.getPlayerInput();
@@ -281,10 +273,9 @@ public class MessageUtils {
                     RoseChatAPI.getInstance().getBungeeManager()
                             .sendDirectMessage(sender, targetName, bungeeMessage, deliveredMessage, (success) -> {
                         if (success) {
-                            // If the message was received successfully, send the sent message to the sender.
+                            // This confirms that RoseChat exists on the receiving server. The receiving
+                            // server is responsible for recipient privacy and actual delivery/capture.
                             sender.send(parsedSentMessage);
-                            if (staffService != null)
-                                staffService.capturePrivateMessage(roseMessage, messageTarget, deliveredMessage);
                         } else {
                             // If the message was not received successfully, then the player is assumed to not be online.
                             sender.sendLocaleMessage("invalid-argument",
@@ -353,6 +344,9 @@ public class MessageUtils {
         if (target == null)
             return;
 
+        if (!canReceiveLocalPrivateMessage(sender, target))
+            return;
+
         RosePlayer messageTarget = new RosePlayer(target);
 
         RoseMessage roseMessage = RoseMessage.forLocation(sender, PermissionArea.MESSAGE);
@@ -398,6 +392,27 @@ public class MessageUtils {
         PlayerData data = messageTarget.getPlayerData();
         if (data != null && data.hasMessageSounds() && Settings.MESSAGE_SOUND.get() != null)
             target.playSound(target.getLocation(), Settings.MESSAGE_SOUND.get(), 1.0f, 1.0f);
+    }
+
+    private static boolean canReceiveLocalPrivateMessage(RosePlayer sender, Player target) {
+        if (!sender.isPlayer())
+            return true;
+
+        PlayerData targetData = RoseChatAPI.getInstance().getPlayerData(target.getUniqueId());
+        if (targetData == null)
+            return true;
+
+        if (!sender.hasPermission("rosechat.togglemessage.bypass") && !targetData.canBeMessaged()) {
+            sender.sendLocaleMessage("command-togglemessage-cannot-message");
+            return false;
+        }
+
+        if (targetData.getIgnoringPlayers().contains(sender.getUUID())) {
+            sender.sendLocaleMessage("command-togglemessage-cannot-message");
+            return false;
+        }
+
+        return true;
     }
 
     public static String applyJSONPlaceholders(String message) {
