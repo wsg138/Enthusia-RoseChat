@@ -275,8 +275,11 @@ public class RoseChat extends RosePlugin {
         if (pluginManager.getPlugin("HuskTowns") != null)
             new HuskTownsChannelProvider().register();
 
-        if (pluginManager.getPlugin("LumaGuilds") != null)
-            new LumaGuildsChannelProvider().register();
+        if (pluginManager.getPlugin("LumaGuilds") != null) {
+            ChannelManager channelManager = this.getManager(ChannelManager.class);
+            if (!channelManager.getChannelProviders().containsKey("lumaguilds"))
+                new LumaGuildsChannelProvider().register();
+        }
     }
 
     public Permission getVault() {
