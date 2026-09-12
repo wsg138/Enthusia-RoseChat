@@ -36,13 +36,16 @@ public class BungeeListener implements PluginMessageListener {
                 return;
             }
 
-            // Make sure RoseChat is sending the message.
-            if (!command.startsWith("rosechat"))
+            if (!command.startsWith("rosechat:"))
                 return;
 
             command = command.substring("rosechat:".length());
 
-            byte[] msgBytes = new byte[in.readShort()];
+            int messageLength = in.readUnsignedShort();
+            if (messageLength > bytes.available())
+                return;
+
+            byte[] msgBytes = new byte[messageLength];
             in.readFully(msgBytes);
             DataInputStream data = new DataInputStream(new ByteArrayInputStream(msgBytes));
 
@@ -51,7 +54,6 @@ public class BungeeListener implements PluginMessageListener {
                     long timestamp = data.readLong();
                     long currentTime = System.currentTimeMillis();
 
-                    // Discard all messages sent a long time ago.
                     if (timestamp + 2000 < currentTime)
                         return;
 
@@ -69,7 +71,8 @@ public class BungeeListener implements PluginMessageListener {
                 }
                 case "direct_message" -> {
                     String sender = data.readUTF();
-                    UUID senderUUID = UUID.fromString(data.readUTF());
+                    String uuidStr = data.readUTF();
+                    UUID senderUUID = uuidStr.equalsIgnoreCase("null") ? null : UUID.fromString(uuidStr);
                     String group = data.readUTF();
                     List<String> permissions = Arrays.asList(data.readUTF().split(","));
                     String json = data.readUTF();
@@ -83,20 +86,22 @@ public class BungeeListener implements PluginMessageListener {
                 case "check_plugin" -> {
                     String sender = data.readUTF();
                     String plugin = data.readUTF();
-                    bungeeManager.receivePluginCheck(sender, plugin);
+                    UUID requestId = data.available() > 0 ? UUID.fromString(data.readUTF()) : null;
+                    bungeeManager.receivePluginCheck(sender, plugin, requestId);
                 }
                 case "confirm_plugin" -> {
                     boolean hasPlugin = data.readBoolean();
                     String sender = data.readUTF();
-                    bungeeManager.receivePluginCheckConfirmation(sender, hasPlugin);
+                    UUID requestId = data.available() > 0 ? UUID.fromString(data.readUTF()) : null;
+                    bungeeManager.receivePluginCheckConfirmation(sender, hasPlugin, requestId);
                 }
                 case "delete_message" -> {
                     UUID messageId = UUID.fromString(data.readUTF());
                     bungeeManager.receiveMessageDeletion(messageId);
                 }
             }
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (IOException | IllegalArgumentException e) {
+            this.plugin.getLogger().warning("Ignoring malformed RoseChat Bungee message: " + e.getMessage());
         }
     }
 
