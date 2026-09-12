@@ -1,5 +1,6 @@
 package dev.rosewood.rosechat.command.command;
 
+import dev.rosewood.rosechat.RoseChat;
 import dev.rosewood.rosechat.command.RoseChatCommand;
 import dev.rosewood.rosechat.message.MessageUtils;
 import dev.rosewood.rosechat.message.RosePlayer;
@@ -11,7 +12,6 @@ import dev.rosewood.rosegarden.command.framework.CommandInfo;
 import dev.rosewood.rosegarden.command.framework.annotation.RoseExecutable;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ReplyCommand extends RoseChatCommand {
 
@@ -39,29 +39,30 @@ public class ReplyCommand extends RoseChatCommand {
 
     @RoseExecutable
     public void execute(CommandContext context, String message) {
-        RosePlayer player = new RosePlayer(context.getSender());
-        String targetName = player.getPlayerData().getReplyTo();
-        if (targetName == null) {
-            player.sendLocaleMessage("command-reply-no-one");
-            return;
-        }
+        Bukkit.getScheduler().runTaskAsynchronously(RoseChat.getInstance(), () -> {
+            RosePlayer player = new RosePlayer(context.getSender());
+            String targetName = player.getPlayerData().getReplyTo();
+            if (targetName == null) {
+                player.sendLocaleMessage("command-reply-no-one");
+                return;
+            }
 
-        OfflinePlayer target = Bukkit.getOfflinePlayer(targetName);
+            OfflinePlayer target = Bukkit.getOfflinePlayer(targetName);
 
-        AtomicBoolean canBeMessaged = new AtomicBoolean(true);
-        if (!context.getSender().hasPermission("rosechat.togglemessage.bypass")) {
+            if (context.getSender().hasPermission("rosechat.togglemessage.bypass")) {
+                MessageUtils.sendPrivateMessage(player, targetName, message);
+                return;
+            }
+
             this.getAPI().getPlayerData(target.getUniqueId(), data -> {
                 if (data != null && !data.canBeMessaged()) {
                     player.sendLocaleMessage("command-togglemessage-cannot-message");
-                    canBeMessaged.set(false);
+                    return;
                 }
+
+                MessageUtils.sendPrivateMessage(player, targetName, message);
             });
-        }
-
-        if (!canBeMessaged.get())
-            return;
-
-        MessageUtils.sendPrivateMessage(player, targetName, message);
+        });
     }
 
 }
