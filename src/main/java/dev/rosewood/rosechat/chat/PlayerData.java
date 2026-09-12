@@ -13,6 +13,7 @@ import dev.rosewood.rosegarden.utils.NMSUtil;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 
@@ -60,8 +61,8 @@ public class PlayerData {
         this.color = "";
         this.currentChannel = RoseChatAPI.getInstance().getChannelManager().getDefaultChannel();
         this.groupInvites = new ArrayList<>();
-        this.ignoringPlayers = new ArrayList<>();
-        this.hiddenChannels = new ArrayList<>();
+        this.ignoringPlayers = new CopyOnWriteArrayList<>();
+        this.hiddenChannels = new CopyOnWriteArrayList<>();
         this.chatCompletions = new ArrayList<>();
     }
 
@@ -403,7 +404,7 @@ public class PlayerData {
      * @param isInGroupChannel Whether the current channel is a group channel.
      */
     public void setIsInGroupChannel(boolean isInGroupChannel) {
-        this.isCurrentChannelGroupChannel = isInGroupChannel;
+        this.isCurrentChannelGroupChannel = isInGroupChannel && this.currentChannel instanceof GroupChannel;
     }
 
     /**
