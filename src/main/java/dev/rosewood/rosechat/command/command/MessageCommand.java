@@ -1,6 +1,5 @@
 package dev.rosewood.rosechat.command.command;
 
-import dev.rosewood.rosechat.RoseChat;
 import dev.rosewood.rosechat.chat.PlayerData;
 import dev.rosewood.rosechat.command.RoseChatCommand;
 import dev.rosewood.rosechat.command.argument.OfflinePlayerArgumentHandler;
@@ -13,8 +12,7 @@ import dev.rosewood.rosegarden.command.framework.ArgumentsDefinition;
 import dev.rosewood.rosegarden.command.framework.CommandContext;
 import dev.rosewood.rosegarden.command.framework.CommandInfo;
 import dev.rosewood.rosegarden.command.framework.annotation.RoseExecutable;
-import org.bukkit.Bukkit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import org.bukkit.entity.Player;
 
 public class MessageCommand extends RoseChatCommand {
 
@@ -50,55 +48,36 @@ public class MessageCommand extends RoseChatCommand {
 
     @RoseExecutable
     public void execute(CommandContext context, String targetName, String message) {
-        Bukkit.getScheduler().runTaskAsynchronously(RoseChat.getInstance(), () -> {
-            RosePlayer player = new RosePlayer(context.getSender());
-            RosePlayer target = this.findPlayer(targetName);
-            RosePlayer messagePlayer = new RosePlayer(
-                    target == null ? targetName : target.getRealName(),
-                    target == null ? "default" : target.getPermissionGroup()
-            );
+        RosePlayer player = new RosePlayer(context.getSender());
+        Player target = MessageUtils.getPlayerExact(targetName);
+        RosePlayer messagePlayer = target == null
+                ? new RosePlayer(targetName, "default")
+                : new RosePlayer(target);
 
-            if (MessageUtils.isMessageEmpty(message)) {
-                player.sendLocaleMessage("message-blank");
-                return;
-            }
+        if (MessageUtils.isMessageEmpty(message)) {
+            player.sendLocaleMessage("message-blank");
+            return;
+        }
 
-            AtomicBoolean canBeMessaged = new AtomicBoolean(true);
-            if (target != null && !player.hasPermission("rosechat.togglemessage.bypass")) {
-                this.getAPI().getPlayerData(target.getUUID(), data -> {
-                    if (data != null && !data.canBeMessaged()) {
-                        canBeMessaged.set(false);
-                    }
-                });
-            }
+        MessageUtils.sendPrivateMessage(player, messagePlayer.getRealName(), message);
 
-            if (!canBeMessaged.get()) {
-                player.sendLocaleMessage("command-togglemessage-cannot-message");
-                return;
-            }
+        if (player.isPlayer()) {
+            player.getPlayerData().setReplyTo(messagePlayer.getRealName());
+            player.getPlayerData().save();
+        }
 
-            MessageUtils.sendPrivateMessage(player, messagePlayer.getRealName(), message);
+        if (this.getAPI().isBungee())
+            this.getAPI().getBungeeManager().sendUpdateReply(player.getRealName(), messagePlayer.getRealName());
 
-            if (player.isPlayer()) {
-                player.getPlayerData().setReplyTo(messagePlayer.getRealName());
-                player.getPlayerData().save();
-            }
+        if (target == null)
+            return;
 
-            if (this.getAPI().isBungee())
-                this.getAPI().getBungeeManager().sendUpdateReply(player.getRealName(), messagePlayer.getRealName());
+        PlayerData targetData = this.getAPI().getPlayerData(target.getUniqueId());
+        if (targetData == null)
+            return;
 
-            if (!messagePlayer.isPlayer() && !messagePlayer.isConsole())
-                return;
-
-            if (target != null) {
-                PlayerData targetData = target.getPlayerData();
-                if (targetData == null)
-                    return;
-
-                targetData.setReplyTo(player.getRealName());
-                targetData.save();
-            }
-        });
+        targetData.setReplyTo(player.getRealName());
+        targetData.save();
     }
 
 }
