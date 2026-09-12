@@ -170,10 +170,13 @@ public class PlayerListener implements Listener {
         playerDataManager.getPlayerData(leavingPlayer.getUUID()).save();
         playerDataManager.getPlayerData(leavingPlayer.getUUID()).getCurrentChannel().onLeave(leavingPlayer);
 
-        // Delay unloading to keep data cached while the player is leaving.
-        Bukkit.getScheduler().runTaskLaterAsynchronously(RoseChat.getInstance(), () -> {
-            if (!leavingPlayer.asPlayer().isOnline())
-                playerDataManager.unloadPlayerData(leavingPlayer.getUUID());
+        // Delay unloading to keep data cached while the player is leaving. Run the check on the
+        // server thread and look the player up again instead of dereferencing a stale RosePlayer.
+        UUID leavingUuid = leavingPlayer.getUUID();
+        Bukkit.getScheduler().runTaskLater(RoseChat.getInstance(), () -> {
+            Player onlinePlayer = Bukkit.getPlayer(leavingUuid);
+            if (onlinePlayer == null || !onlinePlayer.isOnline())
+                playerDataManager.unloadPlayerData(leavingUuid);
         }, 20L * 30L);
 
         GroupChannel group = leavingPlayer.getOwnedGroupChannel();
@@ -278,8 +281,6 @@ public class PlayerListener implements Listener {
                         boolean success = player.switchChannel(channel, channel instanceof GroupChannel);
                         if (!success)
                             return;
-
-                        player.switchChannel(channel);
 
                         String joinMessage = channel.getSettings().getFormats().get("join-message");
                         if (joinMessage != null)
