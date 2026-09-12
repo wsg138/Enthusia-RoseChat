@@ -1,6 +1,7 @@
 package dev.rosewood.rosechat.message.tokenizer.placeholder;
 
 import dev.rosewood.rosechat.message.MessageUtils;
+import dev.rosewood.rosechat.message.RosePlayer;
 import dev.rosewood.rosechat.message.tokenizer.Token;
 import dev.rosewood.rosechat.message.tokenizer.Token.PlayerInputState;
 import dev.rosewood.rosechat.message.tokenizer.Tokenizer;
@@ -48,13 +49,15 @@ public class PAPIPlaceholderTokenizer extends Tokenizer {
 
             String content;
             if (placeholder.startsWith("%other_") && !this.isBungee) {
-                OfflinePlayer offlineReceiver = Bukkit.getOfflinePlayer(params.getReceiver().getRealName());
+                OfflinePlayer offlineReceiver = this.resolveOfflinePlayer(params.getReceiver());
                 content = PlaceholderAPIHook.applyRelationalPlaceholders(params.getSender().asPlayer(), params.getReceiver().asPlayer(), placeholder.replaceFirst("other_", ""));
-                content = PlaceholderAPIHook.applyPlaceholders(offlineReceiver, content.replaceFirst("other_", ""));
+                if (offlineReceiver != null)
+                    content = PlaceholderAPIHook.applyPlaceholders(offlineReceiver, content.replaceFirst("other_", ""));
             } else {
-                OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(params.getSender().getRealName());
+                OfflinePlayer offlinePlayer = this.resolveOfflinePlayer(params.getSender());
                 content = PlaceholderAPIHook.applyRelationalPlaceholders(params.getSender().asPlayer(), params.getReceiver().asPlayer(), placeholder);
-                content = PlaceholderAPIHook.applyPlaceholders(offlinePlayer, content);
+                if (offlinePlayer != null)
+                    content = PlaceholderAPIHook.applyPlaceholders(offlinePlayer, content);
             }
 
             // If we haven't changed, don't allow tokenizing this text anymore
@@ -80,6 +83,20 @@ public class PAPIPlaceholderTokenizer extends Tokenizer {
         }
 
         return results;
+    }
+
+    /**
+     * Resolve a RosePlayer without ever turning a username into a profile. Bukkit's UUID overload
+     * is a local lookup; the String overload may block on Mojang profile services.
+     */
+    private OfflinePlayer resolveOfflinePlayer(RosePlayer player) {
+        if (player == null)
+            return null;
+
+        if (player.isPlayer())
+            return player.asPlayer();
+
+        return player.getUUID() == null ? null : Bukkit.getOfflinePlayer(player.getUUID());
     }
 
     private boolean checkEncapsulation(String content, Pattern... patterns) {
