@@ -11,7 +11,6 @@ import dev.rosewood.rosechat.hook.channel.fabledskyblock.FabledSkyblockChannelPr
 import dev.rosewood.rosechat.hook.channel.factionsuuid.FactionsUUIDChannelProvider;
 import dev.rosewood.rosechat.hook.channel.husktowns.HuskTownsChannelProvider;
 import dev.rosewood.rosechat.hook.channel.kingdomsx.KingdomsXChannelProvider;
-import dev.rosewood.rosechat.hook.channel.lumaguilds.LumaGuildsChannelProvider;
 import dev.rosewood.rosechat.hook.channel.marriagemaster.MarriageMasterChannelProvider;
 import dev.rosewood.rosechat.hook.channel.mcmmo.McMMOChannelProvider;
 import dev.rosewood.rosechat.hook.channel.rosechat.RoseChatChannelProvider;
@@ -98,7 +97,6 @@ public class RoseChat extends RosePlugin {
         PluginManager pluginManager = Bukkit.getPluginManager();
         this.initHooks(pluginManager);
 
-        // Register Listeners
         pluginManager.registerEvents(new PlayerListener(this), this);
 
         if (NMSUtil.getVersionNumber() >= 20) {
@@ -126,7 +124,6 @@ public class RoseChat extends RosePlugin {
     public void reload() {
         super.reload();
 
-        // Unregister and register the chat event for a configurable priority.
         try {
             EventPriority priority = Settings.CHAT_EVENT_PRIORITY.get();
             if (this.chatListener != null) {
@@ -149,13 +146,11 @@ public class RoseChat extends RosePlugin {
                     "&eThe chat-event-priority is not a valid EventPriority");
         }
 
-        // Unregister and register the packet event for a configurable priority.
         PluginManager pluginManager = Bukkit.getPluginManager();
         if (pluginManager.isPluginEnabled("ProtocolLib") && NMSUtil.getVersionNumber() >= 17) {
             PacketListener<?> packetListener = NMSUtil.isPaper() ? new AdventurePacketListener(this) : new BungeePacketListener(this);
             packetListener.removeListeners();
 
-            // Only add the listener if deleting messages is enabled.
             if (Settings.ENABLE_DELETING_MESSAGES.get())
                 packetListener.addListener();
         }
@@ -275,8 +270,8 @@ public class RoseChat extends RosePlugin {
         if (pluginManager.getPlugin("HuskTowns") != null)
             new HuskTownsChannelProvider().register();
 
-        if (pluginManager.getPlugin("LumaGuilds") != null)
-            new LumaGuildsChannelProvider().register();
+        // LumaGuilds owns and registers its RoseChat ChannelProvider after its Koin graph is ready.
+        // Keeping a second provider here makes channel behavior depend on plugin load/reload order.
     }
 
     public Permission getVault() {
