@@ -17,11 +17,12 @@ import dev.rosewood.rosegarden.manager.Manager;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -29,13 +30,13 @@ import org.bukkit.entity.Player;
 public class BungeeManager extends Manager {
 
     private final Multimap<String, String> bungeePlayers;
-    private final List<String> checkPluginPlayers;
+    private final Set<String> checkPluginPlayers;
 
     public BungeeManager(RosePlugin rosePlugin) {
         super(rosePlugin);
 
         this.bungeePlayers = ArrayListMultimap.create();
-        this.checkPluginPlayers = new ArrayList<>();
+        this.checkPluginPlayers = ConcurrentHashMap.newKeySet();
 
         if (RoseChatAPI.getInstance().isBungee() && Settings.ALLOW_BUNGEECORD_MESSAGES.get()) {
             Bukkit.getScheduler().runTaskTimerAsynchronously(rosePlugin, () -> {
@@ -227,12 +228,16 @@ public class BungeeManager extends Manager {
      * @param message The unformatted message being received.
      */
     public void receiveDirectMessage(Player player, String senderStr, UUID senderUUID, String group, List<String> permissions, String json, String message) {
-        PlayerData playerData = this.rosePlugin.getManager(PlayerDataManager.class).getPlayerData(player.getUniqueId());
-        if (playerData.getIgnoringPlayers().contains(senderUUID))
-            return;
-
         RosePlayer sender = new RosePlayer(senderUUID, senderStr, group);
         sender.setIgnoredPermissions(permissions);
+
+        PlayerData playerData = this.rosePlugin.getManager(PlayerDataManager.class).getPlayerData(player.getUniqueId());
+        boolean canBypassToggle = permissions.stream()
+                .anyMatch(permission -> permission.equals("*") || permission.equalsIgnoreCase("togglemessage.bypass"));
+        if ((!canBypassToggle && !playerData.canBeMessaged())
+                || playerData.getIgnoringPlayers().contains(senderUUID))
+            return;
+
         if (json == null || json.isEmpty())
             MessageUtils.sendPrivateMessage(sender, player.getName(), message);
         else
@@ -265,11 +270,22 @@ public class BungeeManager extends Manager {
 
         Bukkit.getScheduler().runTaskAsynchronously(this.rosePlugin, () -> {
             int timeout = Settings.BUNGEECORD_MESSAGE_TIMEOUT.get();
-            long startTime = System.currentTimeMillis();
-            while (startTime + timeout > System.currentTimeMillis()) {
-                if (this.checkPluginPlayers.contains(sender)) {
-                    this.checkPluginPlayers.remove(sender);
+            long deadline = System.currentTimeMillis() + timeout;
+            while (System.currentTimeMillis() < deadline) {
+                if (this.checkPluginPlayers.remove(sender)) {
                     callback.accept(true);
+                    return;
+                }
+
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0)
+                    break;
+
+                try {
+                    Thread.sleep(Math.min(10L, remaining));
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    callback.accept(false);
                     return;
                 }
             }
@@ -279,7 +295,7 @@ public class BungeeManager extends Manager {
     }
 
     /**
-     * Called when the server receives a "check_plugin" message.
+     * Called when the server receives the "check_plugin" message.
      * @param sender The name of the player who sent the original message.
      * @param plugin The name of the plugin that is being checked.
      */
@@ -290,7 +306,7 @@ public class BungeeManager extends Manager {
     /**
      * Sends a message to confirm that the plugin is or is not installed.
      * @param sender The name of the player who sent the original message.
-     * @param hasPlugin True if the server has the plugin.
+     * @param hasPlugin True if the plugin exists on the receiving server.
      */
     public void sendPluginCheckConfirmation(String sender, boolean hasPlugin) {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -307,9 +323,9 @@ public class BungeeManager extends Manager {
     }
 
     /**
-     * Called when the server receives a "confirm_plugin" message.
+     * Called when the server receives the "confirm_plugin" message.
      * @param player The name of the player who sent the original message.
-     * @param hasPlugin True if the server has the plugin.
+     * @param hasPlugin True if the plugin exists on the receiving server.
      */
     public void receivePluginCheckConfirmation(String player, boolean hasPlugin) {
         if (hasPlugin)
@@ -339,7 +355,7 @@ public class BungeeManager extends Manager {
     }
 
     /**
-     * Called when the server receives the "update_reply" message.
+     * Called when a player receives the "update_reply" message.
      * @param player The player who should receive the message.
      * @param sender The name of the player who sent the message.
      */
@@ -356,9 +372,9 @@ public class BungeeManager extends Manager {
     //
 
     /**
-     * Sends a message to delete a message.
+     * Sends a message to delete a message on another server.
      * @param server The server to delete the message on.
-     * @param messageId The {@link UUID} of the message to delete.
+     * @param messageId The id of the message to delete.
      */
     public void sendMessageDeletion(String server, UUID messageId) {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -373,9 +389,8 @@ public class BungeeManager extends Manager {
         this.send("Forward", server, "rosechat:delete_message", outputStream, out);
     }
 
-
     /**
-     * Called when the server receives a "delete_message" message.
+     * Called when the server receives the "delete_message" message.
      * @param messageId The id of the message to delete.
      */
     public void receiveMessageDeletion(UUID messageId) {
