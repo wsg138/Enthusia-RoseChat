@@ -20,9 +20,17 @@ apply plugin: 'com.gradleup.shadow'
 group = 'dev.rosewood'
 version = 'RC-4'
 
+def lumaGuildsJar = file(System.getenv('LUMAGUILDS_JAR') ?: 'libs/LumaGuilds-2.1.0.jar')
+
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(21))
     disableAutoTargetJvm()
+}
+
+sourceSets {
+    lumaGuildsApi {
+        java.srcDir 'src/lumaGuildsApi/java'
+    }
 }
 
 compileJava {
@@ -88,7 +96,15 @@ dependencies {
     compileOnly 'net.essentialsx:EssentialsX:2.20.1', {
         exclude group: 'org.spigotmc'
     }
-    compileOnly 'net.william278:husktowns-bukkit:3.1.4'
+    compileOnly 'net.william278.husktowns:husktowns-bukkit:3.1.4'
+    // LumaGuilds is not publicly available on a Maven repo. Drop the built jar into
+    // libs/ from the LumaGuilds project (libs/ is gitignored).
+    if (lumaGuildsJar.isFile()) {
+        compileOnly files(lumaGuildsJar)
+    } else {
+        compileOnly sourceSets.lumaGuildsApi.output
+    }
+    compileOnly 'org.jetbrains.kotlin:kotlin-stdlib:2.0.0'
 
     testImplementation platform('org.junit:junit-bom:5.12.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -111,7 +127,7 @@ processResources {
 }
 
 shadowJar {
-    archiveClassifier.set(null)
+    archiveClassifier.set(null);
     relocate('dev.rosewood.rosegarden', 'dev.rosewood.rosechat.lib.rosegarden')
     relocate('org.apache', 'dev.rosewood.rosechat.lib.apache')
     minimize()
