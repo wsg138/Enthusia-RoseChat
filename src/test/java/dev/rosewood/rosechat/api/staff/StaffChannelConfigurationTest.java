@@ -30,6 +30,14 @@ class StaffChannelConfigurationTest {
     }
 
     @Test
+    void rejectsPrivateGlobalChannelCollision() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new StaffChannelConfiguration("staff", " global ", Set.of("GLOBAL"))
+        );
+    }
+
+    @Test
     void rejectsBlankPrivateChannelIds() {
         assertThrows(
                 IllegalArgumentException.class,

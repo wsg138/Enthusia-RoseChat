@@ -21,6 +21,7 @@ import dev.rosewood.rosegarden.utils.StringPlaceholders;
 import java.text.Normalizer;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import me.clip.placeholderapi.PlaceholderAPI;
@@ -149,6 +150,29 @@ public class MessageUtils {
      * @param message The message to send.
      */
     public static void sendPrivateMessage(RosePlayer sender, String targetName, String message) {
+        sendPrivateMessage(sender, targetName, message, null, null);
+    }
+
+    /**
+     * Sends a private message and reports whether recipient delivery completed.
+     * @param sender The {@link RosePlayer} who sent the message.
+     * @param targetName The name of the player receiving the message.
+     * @param message The message to send.
+     * @param callback The delivery result callback.
+     */
+    public static void sendPrivateMessage(RosePlayer sender, String targetName, String message, Consumer<Boolean> callback) {
+        sendPrivateMessage(sender, targetName, message, null, callback);
+    }
+
+    /**
+     * Sends a private message using an existing message ID when supplied.
+     * @param sender The {@link RosePlayer} who sent the message.
+     * @param targetName The name of the player receiving the message.
+     * @param message The message to send.
+     * @param messageId The message ID to preserve, or null to generate one locally.
+     * @param callback The delivery result callback.
+     */
+    public static void sendPrivateMessage(RosePlayer sender, String targetName, String message, UUID messageId, Consumer<Boolean> callback) {
         RoseChatAPI api = RoseChatAPI.getInstance();
         String consoleName = api.getLocaleManager().getMessage("console-sender-name");
         boolean isConsoleName = targetName.equalsIgnoreCase("Console") ||
@@ -166,6 +190,7 @@ public class MessageUtils {
                         StringPlaceholders.of("message",
                                 RoseChatAPI.getInstance().getLocaleManager()
                                         .getLocaleMessage("argument-handler-player")));
+                completePrivateMessage(callback, false);
                 return;
             }
 
@@ -176,20 +201,27 @@ public class MessageUtils {
                             StringPlaceholders.of("message",
                                     RoseChatAPI.getInstance().getLocaleManager()
                                             .getLocaleMessage("argument-handler-player")));
+                    completePrivateMessage(callback, false);
                     return;
                 }
             }
         }
 
-        if (target != null && !canReceiveLocalPrivateMessage(sender, target))
+        if (target != null && !canReceiveLocalPrivateMessage(sender, target)) {
+            completePrivateMessage(callback, false);
             return;
+        }
 
         RoseMessage roseMessage = RoseMessage.forLocation(sender, PermissionArea.MESSAGE);
+        if (messageId != null)
+            roseMessage.setUUID(messageId);
 
         RoseChatStaffServiceImpl staffService = RoseChat.getInstance().getStaffService();
         if (staffService != null
-                && !staffService.allowPrivatePreflight(roseMessage, messageTarget, message))
+                && !staffService.allowPrivatePreflight(roseMessage, messageTarget, message)) {
+            completePrivateMessage(callback, false);
             return;
+        }
 
         MessageRules rules = new MessageRules().applyAllFilters();
         RuleOutputs outputs = rules.apply(roseMessage, message);
@@ -214,13 +246,16 @@ public class MessageUtils {
                 }
             }
 
+            completePrivateMessage(callback, false);
             return;
         }
 
         String deliveredMessage = roseMessage.getPlayerInput();
         if (staffService != null
-                && !staffService.allowPrivateMessage(roseMessage, messageTarget, deliveredMessage))
+                && !staffService.allowPrivateMessage(roseMessage, messageTarget, deliveredMessage)) {
+            completePrivateMessage(callback, false);
             return;
+        }
 
         // Parse the message for the console
         MessageContents parsedMessage = roseMessage.parse(messageTarget, Settings.CONSOLE_MESSAGE_FORMAT.get());
@@ -249,65 +284,69 @@ public class MessageUtils {
 
         PlayerSendMessageEvent sendEvent = new PlayerSendMessageEvent(sender, messageTarget, roseMessage);
         Bukkit.getPluginManager().callEvent(sendEvent);
-        if (sendEvent.isCancelled())
+        if (sendEvent.isCancelled()) {
+            completePrivateMessage(callback, false);
             return;
+        }
 
-        // Parse the message for the sender and the receiver.
+        // Parse off-thread, then return to the server thread for Bukkit events and delivery.
         RoseChat.MESSAGE_THREAD_POOL.execute(() -> {
             MessageContents parsedSentMessage = roseMessage.parse(messageTarget, Settings.MESSAGE_SENT_FORMAT.get());
-
             MessageContents receivedMessageOutput = roseMessage.parse(messageTarget,
                     Settings.MESSAGE_RECEIVED_FORMAT.get());
 
-            if (target == null) {
-                // If the target is not valid and the name is "Console", then send the message to the console.
-                if (isConsoleName) {
-                    sender.send(parsedSentMessage);
-                    receivedMessageOutput.sendMessage(Bukkit.getConsoleSender());
+            Bukkit.getScheduler().runTask(RoseChat.getInstance(), () -> {
+                if (target == null) {
+                    // If the target is not valid and the name is "Console", then send the message to the console.
+                    if (isConsoleName) {
+                        sender.send(parsedSentMessage);
+                        receivedMessageOutput.sendMessage(Bukkit.getConsoleSender());
+                        if (staffService != null)
+                            staffService.capturePrivateMessage(roseMessage, messageTarget, deliveredMessage);
+                        completePrivateMessage(callback, true);
+                    } else {
+                        boolean keepFormat = Settings.KEEP_MESSAGE_FORMAT.get();
+                        String bungeeMessage = keepFormat ? receivedMessageOutput.build(ChatComposer.json()) : null;
+
+                        RoseChatAPI.getInstance().getBungeeManager()
+                                .sendDirectMessage(sender, targetName, roseMessage.getUUID(), bungeeMessage, deliveredMessage, success -> {
+                            if (success) {
+                                sender.send(parsedSentMessage);
+                            } else {
+                                sender.sendLocaleMessage("invalid-argument",
+                                        StringPlaceholders.of("message",
+                                                RoseChatAPI.getInstance().getLocaleManager()
+                                                        .getLocaleMessage("argument-handler-player")));
+                            }
+                            completePrivateMessage(callback, success);
+                        });
+                    }
+                } else {
+                    PlayerReceiveMessageEvent receiveEvent = new PlayerReceiveMessageEvent(sender, messageTarget,
+                            roseMessage, receivedMessageOutput);
+                    Bukkit.getPluginManager().callEvent(receiveEvent);
+                    if (receiveEvent.isCancelled()) {
+                        completePrivateMessage(callback, false);
+                        return;
+                    }
+
+                    // Confirm to the sender only after the recipient actually receives the message.
+                    messageTarget.send(receiveEvent.getContents());
                     if (staffService != null)
                         staffService.capturePrivateMessage(roseMessage, messageTarget, deliveredMessage);
-                } else {
-                    boolean keepFormat = Settings.KEEP_MESSAGE_FORMAT.get();
-                    String bungeeMessage = keepFormat ? receivedMessageOutput.build(ChatComposer.json()) : null;
 
-                    RoseChatAPI.getInstance().getBungeeManager()
-                            .sendDirectMessage(sender, targetName, bungeeMessage, deliveredMessage, (success) -> {
-                        if (success) {
-                            // This confirms that RoseChat exists on the receiving server. The receiving
-                            // server is responsible for recipient privacy and actual delivery/capture.
-                            sender.send(parsedSentMessage);
-                        } else {
-                            // If the message was not received successfully, then the player is assumed to not be online.
-                            sender.sendLocaleMessage("invalid-argument",
-                                    StringPlaceholders.of("message",
-                                            RoseChatAPI.getInstance().getLocaleManager()
-                                                    .getLocaleMessage("argument-handler-player")));
+                    if (messageTarget.isPlayer()) {
+                        Player targetPlayer = messageTarget.asPlayer();
+                        PlayerData targetData = messageTarget.getPlayerData();
+                        if (targetData != null && targetData.hasMessageSounds() && Settings.MESSAGE_SOUND.get() != null) {
+                            targetPlayer.playSound(targetPlayer.getLocation(), Settings.MESSAGE_SOUND.get(), 1.0f, 1.0f);
                         }
-                    });
-                }
-            } else {
-                // The sender should receive the message first.
-                sender.send(parsedSentMessage);
-
-                PlayerReceiveMessageEvent receiveEvent = new PlayerReceiveMessageEvent(sender, messageTarget,
-                        roseMessage, receivedMessageOutput);
-                Bukkit.getPluginManager().callEvent(receiveEvent);
-                if (receiveEvent.isCancelled())
-                    return;
-
-                // If the target is online, send the message.
-                messageTarget.send(receiveEvent.getContents());
-                if (staffService != null)
-                    staffService.capturePrivateMessage(roseMessage, messageTarget, deliveredMessage);
-
-                if (messageTarget.isPlayer()) {
-                    Player targetPlayer = messageTarget.asPlayer();
-                    PlayerData targetData = messageTarget.getPlayerData();
-                    if (targetData != null && targetData.hasMessageSounds() && Settings.MESSAGE_SOUND.get() != null) {
-                        targetPlayer.playSound(targetPlayer.getLocation(), Settings.MESSAGE_SOUND.get(), 1.0f, 1.0f);
                     }
+
+                    sender.send(parsedSentMessage);
+                    completePrivateMessage(callback, true);
                 }
-            }
+            });
         });
 
         // Update the player's display name if the setting is enabled.
@@ -338,29 +377,43 @@ public class MessageUtils {
      * @param input The input of the message to send.
      */
     public static void sendPrivateJsonMessage(RosePlayer sender, String targetName, String json, String input) {
+        sendPrivateJsonMessage(sender, targetName, json, input, null, null);
+    }
+
+    public static void sendPrivateJsonMessage(RosePlayer sender, String targetName, String json, String input,
+                                              UUID messageId, Consumer<Boolean> callback) {
         RoseChatAPI api = RoseChatAPI.getInstance();
 
         Player target = MessageUtils.getPlayerExact(targetName);
-        if (target == null)
+        if (target == null) {
+            completePrivateMessage(callback, false);
             return;
+        }
 
-        if (!canReceiveLocalPrivateMessage(sender, target))
+        if (!canReceiveLocalPrivateMessage(sender, target)) {
+            completePrivateMessage(callback, false);
             return;
+        }
 
         RosePlayer messageTarget = new RosePlayer(target);
 
         RoseMessage roseMessage = RoseMessage.forLocation(sender, PermissionArea.MESSAGE);
+        if (messageId != null)
+            roseMessage.setUUID(messageId);
         roseMessage.setPlayerInput(json);
 
         RoseChatStaffServiceImpl staffService = RoseChat.getInstance().getStaffService();
         if (staffService != null) {
             if (!staffService.allowPrivatePreflight(roseMessage, messageTarget, input)
-                    || !staffService.allowPrivateMessage(roseMessage, messageTarget, input))
+                    || !staffService.allowPrivateMessage(roseMessage, messageTarget, input)) {
+                completePrivateMessage(callback, false);
                 return;
+            }
         }
 
         RosePlayer console = new RosePlayer(Bukkit.getConsoleSender());
         RoseMessage consoleMessage = RoseMessage.forLocation(sender, PermissionArea.MESSAGE);
+        consoleMessage.setUUID(roseMessage.getUUID());
         consoleMessage.setPlayerInput(input);
         console.send(consoleMessage.parse(messageTarget, Settings.CONSOLE_MESSAGE_FORMAT.get()));
 
@@ -383,8 +436,10 @@ public class MessageUtils {
 
         PlayerReceiveMessageEvent receiveEvent = new PlayerReceiveMessageEvent(sender, messageTarget, roseMessage, parsedMessage);
         Bukkit.getPluginManager().callEvent(receiveEvent);
-        if (receiveEvent.isCancelled())
+        if (receiveEvent.isCancelled()) {
+            completePrivateMessage(callback, false);
             return;
+        }
 
         messageTarget.send(receiveEvent.getContents());
         if (staffService != null)
@@ -392,6 +447,20 @@ public class MessageUtils {
         PlayerData data = messageTarget.getPlayerData();
         if (data != null && data.hasMessageSounds() && Settings.MESSAGE_SOUND.get() != null)
             target.playSound(target.getLocation(), Settings.MESSAGE_SOUND.get(), 1.0f, 1.0f);
+
+        completePrivateMessage(callback, true);
+    }
+
+    private static void completePrivateMessage(Consumer<Boolean> callback, boolean success) {
+        if (callback == null)
+            return;
+
+        Runnable completion = () -> callback.accept(success);
+        if (Bukkit.isPrimaryThread()) {
+            completion.run();
+        } else {
+            Bukkit.getScheduler().runTask(RoseChat.getInstance(), completion);
+        }
     }
 
     private static boolean canReceiveLocalPrivateMessage(RosePlayer sender, Player target) {

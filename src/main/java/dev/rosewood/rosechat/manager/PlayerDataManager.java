@@ -32,6 +32,12 @@ public class PlayerDataManager extends Manager {
 
         // Delay to make sure channels are loaded first.
         Bukkit.getScheduler().runTaskLater(RoseChat.getInstance(), () -> {
+            Channel defaultChannel = RoseChatAPI.getInstance().getChannelManager().getDefaultChannel();
+            if (defaultChannel == null) {
+                this.rosePlugin.getLogger().severe("Skipping player channel reload because no valid default channel is available.");
+                return;
+            }
+
             Bukkit.getOnlinePlayers().forEach(player -> this.getPlayerData(player.getUniqueId(), data -> {
                 RosePlayer rosePlayer = new RosePlayer(player);
 
@@ -39,7 +45,6 @@ public class PlayerDataManager extends Manager {
                 if (data.getCurrentChannel() != null) {
                     data.getCurrentChannel().onJoin(rosePlayer);
                 } else {
-                    Channel defaultChannel = RoseChatAPI.getInstance().getChannelManager().getDefaultChannel();
                     defaultChannel.onJoin(rosePlayer);
                     data.setCurrentChannel(defaultChannel);
                     data.save();

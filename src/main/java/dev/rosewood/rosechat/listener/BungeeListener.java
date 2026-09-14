@@ -77,7 +77,13 @@ public class BungeeListener implements PluginMessageListener {
                     List<String> permissions = Arrays.asList(data.readUTF().split(","));
                     String json = data.readUTF();
                     String rcMessage = data.readUTF();
-                    bungeeManager.receiveDirectMessage(player, sender, senderUUID, group, permissions, json, rcMessage);
+                    UUID messageId = data.available() > 0 ? UUID.fromString(data.readUTF()) : null;
+                    bungeeManager.receiveDirectMessage(player, sender, senderUUID, group, permissions, messageId, json, rcMessage);
+                }
+                case "direct_message_result" -> {
+                    UUID messageId = UUID.fromString(data.readUTF());
+                    boolean success = data.readBoolean();
+                    bungeeManager.receiveDirectMessageResult(messageId, success);
                 }
                 case "update_reply" -> {
                     String sender = data.readUTF();

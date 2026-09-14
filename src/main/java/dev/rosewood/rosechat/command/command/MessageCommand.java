@@ -59,25 +59,30 @@ public class MessageCommand extends RoseChatCommand {
             return;
         }
 
-        MessageUtils.sendPrivateMessage(player, messagePlayer.getRealName(), message);
+        MessageUtils.sendPrivateMessage(player, messagePlayer.getRealName(), message, success -> {
+            if (!success)
+                return;
 
-        if (player.isPlayer()) {
-            player.getPlayerData().setReplyTo(messagePlayer.getRealName());
-            player.getPlayerData().save();
-        }
+            if (player.isPlayer()) {
+                player.getPlayerData().setReplyTo(messagePlayer.getRealName());
+                player.getPlayerData().save();
+            }
 
-        if (this.getAPI().isBungee())
-            this.getAPI().getBungeeManager().sendUpdateReply(player.getRealName(), messagePlayer.getRealName());
+            if (target == null) {
+                if (this.getAPI().isBungee()
+                        && this.getAPI().getBungeeManager().getAllPlayers().contains(messagePlayer.getRealName())) {
+                    this.getAPI().getBungeeManager().sendUpdateReply(player.getRealName(), messagePlayer.getRealName());
+                }
+                return;
+            }
 
-        if (target == null)
-            return;
+            PlayerData targetData = this.getAPI().getPlayerData(target.getUniqueId());
+            if (targetData == null)
+                return;
 
-        PlayerData targetData = this.getAPI().getPlayerData(target.getUniqueId());
-        if (targetData == null)
-            return;
-
-        targetData.setReplyTo(player.getRealName());
-        targetData.save();
+            targetData.setReplyTo(player.getRealName());
+            targetData.save();
+        });
     }
 
 }

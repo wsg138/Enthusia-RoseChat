@@ -19,9 +19,11 @@ public record StaffChannelConfiguration(
         Set<String> normalizedPrivateChannels = new LinkedHashSet<>();
         if (privateChannelIds != null) {
             for (String channelId : privateChannelIds) {
-                normalizedPrivateChannels.add(
-                        normalizeRequired(channelId, "privateChannelId").toLowerCase(Locale.ROOT)
-                );
+                String normalizedChannelId = normalizeRequired(channelId, "privateChannelId");
+                if (!globalChannelId.isEmpty() && globalChannelId.equalsIgnoreCase(normalizedChannelId)) {
+                    throw new IllegalArgumentException("privateChannelId must not match the global channel");
+                }
+                normalizedPrivateChannels.add(normalizedChannelId.toLowerCase(Locale.ROOT));
             }
         }
         privateChannelIds = Set.copyOf(normalizedPrivateChannels);

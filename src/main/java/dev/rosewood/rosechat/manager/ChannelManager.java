@@ -29,6 +29,7 @@ public class ChannelManager extends Manager {
     private LocaleManager localeManager;
     private Channel defaultChannel;
     private CommentedFileConfiguration channelsConfig;
+    private BukkitTask channelGenerationTask;
     private BukkitTask worldGuardTask;
 
     public ChannelManager(RosePlugin rosePlugin) {
@@ -43,6 +44,11 @@ public class ChannelManager extends Manager {
     public void reload() {
         this.localeManager = this.rosePlugin.getManager(LocaleManager.class);
 
+        if (this.channelGenerationTask != null) {
+            this.channelGenerationTask.cancel();
+            this.channelGenerationTask = null;
+        }
+
         if (this.worldGuardTask != null) {
             this.worldGuardTask.cancel();
             this.worldGuardTask = null;
@@ -55,9 +61,14 @@ public class ChannelManager extends Manager {
         this.channelsConfig = CommentedFileConfiguration.loadConfiguration(channelsFile);
         this.registerCommands(this.channelsConfig);
 
-        // Delay generating channels until channel providers are registered.
-        Bukkit.getScheduler().runTaskLater(this.rosePlugin, () -> {
+        // Delay generating channels until channel providers are registered. Keep the task reference so
+        // another reload cannot leave this callback alive and create a second WorldGuard timer.
+        this.channelGenerationTask = Bukkit.getScheduler().runTaskLater(this.rosePlugin, () -> {
+            this.channelGenerationTask = null;
             this.generateChannels();
+            if (this.defaultChannel == null)
+                return;
+
             if (this.channelProviders.containsKey("worldguard")) {
                 long interval = Settings.WORLDGUARD_CHECK_INTERVAL.get();
                 if (interval != 0) {
@@ -72,6 +83,11 @@ public class ChannelManager extends Manager {
 
     @Override
     public void disable() {
+        if (this.channelGenerationTask != null) {
+            this.channelGenerationTask.cancel();
+            this.channelGenerationTask = null;
+        }
+
         if (this.worldGuardTask != null) {
             this.worldGuardTask.cancel();
             this.worldGuardTask = null;
