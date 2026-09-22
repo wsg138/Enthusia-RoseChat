@@ -21,7 +21,7 @@ class StaffContextContractTest {
                 "global",
                 ChannelClassification.PUBLIC,
                 "hello",
-                MessageSource.MINECRAFT
+                MessageSource.PLAYER
         );
 
         assertEquals(messageId, context.messageId());
@@ -30,20 +30,20 @@ class StaffContextContractTest {
         assertEquals("global", context.channelId());
         assertEquals(ChannelClassification.PUBLIC, context.classification());
         assertEquals("hello", context.message());
-        assertEquals(MessageSource.MINECRAFT, context.source());
+        assertEquals(MessageSource.PLAYER, context.source());
     }
 
     @Test
     void broadcastContextRejectsMissingRequiredFields() {
         UUID id = UUID.randomUUID();
         assertThrows(NullPointerException.class,
-                () -> new BroadcastContext(null, id, "Alice", "global", ChannelClassification.PUBLIC, "hi", MessageSource.MINECRAFT));
+                () -> new BroadcastContext(null, id, "Alice", "global", ChannelClassification.PUBLIC, "hi", MessageSource.PLAYER));
         assertThrows(NullPointerException.class,
-                () -> new BroadcastContext(id, id, null, "global", ChannelClassification.PUBLIC, "hi", MessageSource.MINECRAFT));
+                () -> new BroadcastContext(id, id, null, "global", ChannelClassification.PUBLIC, "hi", MessageSource.PLAYER));
         assertThrows(NullPointerException.class,
-                () -> new BroadcastContext(id, id, "Alice", "global", null, "hi", MessageSource.MINECRAFT));
+                () -> new BroadcastContext(id, id, "Alice", "global", null, "hi", MessageSource.PLAYER));
         assertThrows(NullPointerException.class,
-                () -> new BroadcastContext(id, id, "Alice", "global", ChannelClassification.PUBLIC, null, MessageSource.MINECRAFT));
+                () -> new BroadcastContext(id, id, "Alice", "global", ChannelClassification.PUBLIC, null, MessageSource.PLAYER));
     }
 
     @Test
