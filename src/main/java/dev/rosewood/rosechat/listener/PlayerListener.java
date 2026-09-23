@@ -2,6 +2,7 @@ package dev.rosewood.rosechat.listener;
 
 import dev.rosewood.rosechat.RoseChat;
 import dev.rosewood.rosechat.api.RoseChatAPI;
+import dev.rosewood.rosechat.api.event.PresenceMessageEvent;
 import dev.rosewood.rosechat.api.staff.PresenceType;
 import dev.rosewood.rosechat.chat.PlayerData;
 import dev.rosewood.rosechat.chat.channel.Channel;
@@ -99,28 +100,34 @@ public class PlayerListener implements Listener {
 
         StringPlaceholders emptyPlaceholders = StringPlaceholders.empty();
 
-        for (CustomPlaceholder joinMessage : joinMessageManager.getJoinMessages()) {
-            PlaceholderCondition messageCondition = joinMessage.get("message");
-            if (messageCondition == null)
+        // Includes the joining player. Aggregate templates before replacement so
+        // one selected cosmetic cannot be repeated once per configured template.
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            if (this.plugin.getStaffService() != null
+                    && !this.plugin.getStaffService().canRenderPresence(
+                            joiningPlayer.getUUID(), online.getUniqueId(), PresenceType.JOIN))
                 continue;
 
-            // Includes the joining player — at NORMAL priority they are already in getOnlinePlayers().
-            for (Player online : Bukkit.getOnlinePlayers()) {
-                if (this.plugin.getStaffService() != null
-                        && !this.plugin.getStaffService().canRenderPresence(
-                                joiningPlayer.getUUID(), online.getUniqueId(), PresenceType.JOIN))
+            RosePlayer viewer = new RosePlayer(online);
+            List<String> defaults = new ArrayList<>();
+            for (CustomPlaceholder joinMessage : joinMessageManager.getJoinMessages()) {
+                PlaceholderCondition messageCondition = joinMessage.get("message");
+                if (messageCondition == null)
                     continue;
-
-                RosePlayer viewer = new RosePlayer(online);
-                List<String> lines = messageCondition.parseToStringList(
-                        joiningPlayer, viewer, emptyPlaceholders);
-                if (lines == null || lines.isEmpty())
-                    continue;
-                for (String line : lines) {
-                    MessageContents parsed = api.parse(joiningPlayer, viewer, line);
-                    if (parsed != null)
-                        viewer.send(parsed);
-                }
+                List<String> lines = messageCondition.parseToStringList(joiningPlayer, viewer, emptyPlaceholders);
+                if (lines != null)
+                    defaults.addAll(lines);
+            }
+            if (defaults.isEmpty())
+                continue;
+            PresenceMessageEvent presence = new PresenceMessageEvent(event.getPlayer(), online, "join", defaults);
+            Bukkit.getPluginManager().callEvent(presence);
+            if (presence.isCancelled())
+                continue;
+            for (String line : presence.getLines()) {
+                MessageContents parsed = api.parse(joiningPlayer, viewer, line);
+                if (parsed != null)
+                    viewer.send(parsed);
             }
         }
 
@@ -142,27 +149,32 @@ public class PlayerListener implements Listener {
 
         StringPlaceholders emptyPlaceholders = StringPlaceholders.empty();
 
-        for (CustomPlaceholder leaveMessage : leaveMessageManager.getLeaveMessages()) {
-            PlaceholderCondition messageCondition = leaveMessage.get("message");
-            if (messageCondition == null)
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            if (this.plugin.getStaffService() != null
+                    && !this.plugin.getStaffService().canRenderPresence(
+                            leavingPlayer.getUUID(), online.getUniqueId(), PresenceType.QUIT))
                 continue;
 
-            for (Player online : Bukkit.getOnlinePlayers()) {
-                if (this.plugin.getStaffService() != null
-                        && !this.plugin.getStaffService().canRenderPresence(
-                                leavingPlayer.getUUID(), online.getUniqueId(), PresenceType.QUIT))
+            RosePlayer viewer = new RosePlayer(online);
+            List<String> defaults = new ArrayList<>();
+            for (CustomPlaceholder leaveMessage : leaveMessageManager.getLeaveMessages()) {
+                PlaceholderCondition messageCondition = leaveMessage.get("message");
+                if (messageCondition == null)
                     continue;
-
-                RosePlayer viewer = new RosePlayer(online);
-                List<String> lines = messageCondition.parseToStringList(
-                        leavingPlayer, viewer, emptyPlaceholders);
-                if (lines == null || lines.isEmpty())
-                    continue;
-                for (String line : lines) {
-                    MessageContents parsed = rcApi.parse(leavingPlayer, viewer, line);
-                    if (parsed != null)
-                        viewer.send(parsed);
-                }
+                List<String> lines = messageCondition.parseToStringList(leavingPlayer, viewer, emptyPlaceholders);
+                if (lines != null)
+                    defaults.addAll(lines);
+            }
+            if (defaults.isEmpty())
+                continue;
+            PresenceMessageEvent presence = new PresenceMessageEvent(event.getPlayer(), online, "quit", defaults);
+            Bukkit.getPluginManager().callEvent(presence);
+            if (presence.isCancelled())
+                continue;
+            for (String line : presence.getLines()) {
+                MessageContents parsed = rcApi.parse(leavingPlayer, viewer, line);
+                if (parsed != null)
+                    viewer.send(parsed);
             }
         }
 
