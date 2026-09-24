@@ -1,5 +1,6 @@
 package dev.rosewood.rosechat.command.command;
 
+import dev.rosewood.rosechat.RoseChat;
 import dev.rosewood.rosechat.command.RoseChatCommand;
 import dev.rosewood.rosechat.command.argument.RoseChatArgumentHandlers;
 import dev.rosewood.rosechat.manager.EnthusiaStaffCommandCompatibility;
@@ -10,6 +11,7 @@ import dev.rosewood.rosegarden.command.framework.CommandContext;
 import dev.rosewood.rosegarden.command.framework.CommandInfo;
 import dev.rosewood.rosegarden.command.framework.annotation.RoseExecutable;
 import dev.rosewood.rosegarden.utils.StringPlaceholders;
+import org.bukkit.Bukkit;
 
 public class UnmuteCommand extends RoseChatCommand {
 
@@ -23,7 +25,7 @@ public class UnmuteCommand extends RoseChatCommand {
                 .descriptionKey("command-unmute-description")
                 .permission("rosechat.unmute")
                 .arguments(ArgumentsDefinition.builder()
-                        .required("player", RoseChatArgumentHandlers.ROSE_PLAYER)
+                        .required("player", RoseChatArgumentHandlers.OFFLINE_PLAYER)
                         .build())
                 .build();
     }
@@ -36,19 +38,31 @@ public class UnmuteCommand extends RoseChatCommand {
     }
 
     @RoseExecutable
-    public void execute(CommandContext context, RosePlayer target) {
-        RosePlayer player = new RosePlayer(context.getSender());
+    public void execute(CommandContext context, String targetName) {
+        Bukkit.getScheduler().runTaskAsynchronously(RoseChat.getInstance(), () -> {
+            RosePlayer target = this.findPlayer(targetName);
+            if (target == null) {
+                this.getLocaleManager().sendComponentMessage(context.getSender(), "invalid-argument",
+                        StringPlaceholders.of("message",
+                                this.getLocaleManager().getLocaleMessage("argument-handler-player")));
+                return;
+            }
 
-        if (!target.isMuted()) {
-            player.sendLocaleMessage("command-unmute-not-muted",
-                    StringPlaceholders.of("player", target.getName()));
-            return;
-        }
+            target.getPlayerData((data) -> {
+                if (data == null)
+                    return;
 
-        target.unmute();
-        player.sendLocaleMessage("command-unmute-success",
-                StringPlaceholders.of("player", target.getName()));
-        target.sendLocaleMessage("command-mute-unmuted");
+                data.unmute();
+                data.save();
+
+                String name = target.getName();
+                this.getLocaleManager().sendComponentMessage(context.getSender(), "command-unmute-success",
+                        StringPlaceholders.of("player", name));
+
+                if (target.isPlayer())
+                    this.getLocaleManager().sendComponentMessage(target, "command-mute-unmuted");
+            });
+        });
     }
 
 }
