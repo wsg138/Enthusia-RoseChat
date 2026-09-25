@@ -3,6 +3,7 @@ package dev.rosewood.rosechat.command.command;
 import dev.rosewood.rosechat.RoseChat;
 import dev.rosewood.rosechat.command.RoseChatCommand;
 import dev.rosewood.rosechat.command.argument.RoseChatArgumentHandlers;
+import dev.rosewood.rosechat.manager.EnthusiaStaffCommandCompatibility;
 import dev.rosewood.rosechat.message.RosePlayer;
 import dev.rosewood.rosegarden.RosePlugin;
 import dev.rosewood.rosegarden.command.framework.ArgumentsDefinition;
@@ -31,7 +32,9 @@ public class UnmuteCommand extends RoseChatCommand {
 
     @Override
     protected boolean hasPriority() {
-        return true;
+        boolean staffInstalled = EnthusiaStaffCommandCompatibility.staffInstalled(
+                this.rosePlugin.getServer().getPluginManager());
+        return EnthusiaStaffCommandCompatibility.defaultPriority(staffInstalled, "unmute", true);
     }
 
     @RoseExecutable
