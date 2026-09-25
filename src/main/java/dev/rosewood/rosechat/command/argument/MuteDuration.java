@@ -1,7 +1,5 @@
 package dev.rosewood.rosechat.command.argument;
 
-import java.util.Locale;
-
 public record MuteDuration(int amount, Unit unit) {
 
     public MuteDuration {
@@ -19,15 +17,11 @@ public record MuteDuration(int amount, Unit unit) {
     }
 
     public boolean indefinite() {
-        return this.unit == Unit.YEARS && this.amount > 1000;
+        return this.unit == Unit.YEAR && this.amount > 1000;
     }
 
     public String displayUnit() {
         return this.amount == 1 ? this.unit.singular() : this.unit.plural();
-    }
-
-    public static Unit unit(String canonicalName) {
-        return Unit.valueOf(canonicalName.trim().toUpperCase(Locale.ROOT));
     }
 
     public enum Unit {
