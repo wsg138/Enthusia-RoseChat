@@ -4,8 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import dev.rosewood.rosegarden.config.CommentedFileConfiguration;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -34,7 +35,7 @@ class EnthusiaStaffCommandCompatibilityTest {
     }
 
     @Test
-    void persistedMutePrioritiesAreDemotedWhenStaffIsInstalled() {
+    void persistedMutePrioritiesAreDemotedWhenStaffIsInstalled() throws IOException {
         File commands = temporaryDirectory.resolve("commands").toFile();
         assertTrue(commands.mkdirs());
         writePriority(commands, "mute", true);
@@ -51,7 +52,7 @@ class EnthusiaStaffCommandCompatibilityTest {
     }
 
     @Test
-    void persistedPrioritiesAreUntouchedWithoutStaff() {
+    void persistedPrioritiesAreUntouchedWithoutStaff() throws IOException {
         File commands = temporaryDirectory.resolve("commands").toFile();
         assertTrue(commands.mkdirs());
         writePriority(commands, "mute", true);
@@ -61,15 +62,12 @@ class EnthusiaStaffCommandCompatibilityTest {
         assertTrue(readPriority(commands, "mute"));
     }
 
-    private static void writePriority(File directory, String command, boolean priority) {
-        File file = new File(directory, command + ".yml");
-        CommentedFileConfiguration configuration = CommentedFileConfiguration.loadConfiguration(file);
-        configuration.set("priority", priority);
-        configuration.save(file);
+    private static void writePriority(File directory, String command, boolean priority) throws IOException {
+        Files.writeString(new File(directory, command + ".yml").toPath(), "priority: " + priority + "\n");
     }
 
-    private static boolean readPriority(File directory, String command) {
-        return CommentedFileConfiguration.loadConfiguration(new File(directory, command + ".yml"))
-                .getBoolean("priority", false);
+    private static boolean readPriority(File directory, String command) throws IOException {
+        String contents = Files.readString(new File(directory, command + ".yml").toPath());
+        return contents.lines().anyMatch(line -> line.trim().equals("priority: true"));
     }
 }
