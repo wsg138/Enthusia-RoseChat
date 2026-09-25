@@ -1,11 +1,14 @@
 package dev.rosewood.rosechat.command.command;
 
+import dev.rosewood.rosechat.RoseChat;
+import dev.rosewood.rosechat.api.staff.PresenceType;
 import dev.rosewood.rosechat.chat.PlayerData;
 import dev.rosewood.rosechat.command.RoseChatCommand;
 import dev.rosewood.rosechat.command.argument.OfflinePlayerArgumentHandler;
 import dev.rosewood.rosechat.config.Settings;
 import dev.rosewood.rosechat.message.MessageUtils;
 import dev.rosewood.rosechat.message.RosePlayer;
+import dev.rosewood.rosechat.staff.RoseChatStaffServiceImpl;
 import dev.rosewood.rosegarden.RosePlugin;
 import dev.rosewood.rosegarden.command.argument.ArgumentHandlers;
 import dev.rosewood.rosegarden.command.framework.ArgumentsDefinition;
@@ -13,6 +16,8 @@ import dev.rosewood.rosegarden.command.framework.CommandContext;
 import dev.rosewood.rosegarden.command.framework.CommandInfo;
 import dev.rosewood.rosegarden.command.framework.annotation.RoseExecutable;
 import dev.rosewood.rosegarden.utils.StringPlaceholders;
+import java.util.UUID;
+import java.util.function.BiPredicate;
 import org.bukkit.entity.Player;
 
 public class MessageCommand extends RoseChatCommand {
@@ -51,6 +56,11 @@ public class MessageCommand extends RoseChatCommand {
     public void execute(CommandContext context, String targetName, String message) {
         RosePlayer player = new RosePlayer(context.getSender());
         Player target = MessageUtils.getPlayerExact(targetName);
+        if (target != null && this.targetHiddenFromSender(player, target)) {
+            this.sendUnavailablePlayer(player);
+            return;
+        }
+
         RosePlayer messagePlayer = target == null
                 ? new RosePlayer(targetName, "default")
                 : new RosePlayer(target);
@@ -66,9 +76,7 @@ public class MessageCommand extends RoseChatCommand {
                 && target == null
                 && this.getAPI().isBungee()
                 && this.getAPI().getBungeeManager().getAllPlayers().contains(messagePlayer.getRealName())) {
-            player.sendLocaleMessage("invalid-argument",
-                    StringPlaceholders.of("message",
-                            this.getAPI().getLocaleManager().getLocaleMessage("argument-handler-player")));
+            this.sendUnavailablePlayer(player);
             return;
         }
 
@@ -103,4 +111,30 @@ public class MessageCommand extends RoseChatCommand {
         });
     }
 
+    private boolean targetHiddenFromSender(RosePlayer sender, Player target) {
+        if (!sender.isPlayer() || sender.getUUID() == null)
+            return false;
+        RoseChatStaffServiceImpl staffService = RoseChat.getInstance().getStaffService();
+        if (staffService == null)
+            return false;
+        return targetHidden(
+                sender.getUUID(),
+                target.getUniqueId(),
+                (subjectId, viewerId) -> staffService.canRenderPresence(subjectId, viewerId, PresenceType.JOIN)
+        );
+    }
+
+    static boolean targetHidden(
+            UUID viewerId,
+            UUID subjectId,
+            BiPredicate<UUID, UUID> canRenderPresence
+    ) {
+        return !canRenderPresence.test(subjectId, viewerId);
+    }
+
+    private void sendUnavailablePlayer(RosePlayer player) {
+        player.sendLocaleMessage("invalid-argument",
+                StringPlaceholders.of("message",
+                        this.getAPI().getLocaleManager().getLocaleMessage("argument-handler-player")));
+    }
 }

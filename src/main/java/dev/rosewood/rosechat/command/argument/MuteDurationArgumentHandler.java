@@ -1,74 +1,61 @@
 package dev.rosewood.rosechat.command.argument;
 
 import dev.rosewood.rosechat.RoseChat;
+import dev.rosewood.rosechat.command.argument.MuteDuration.Unit;
 import dev.rosewood.rosechat.manager.LocaleManager;
 import dev.rosewood.rosegarden.command.framework.Argument;
 import dev.rosewood.rosegarden.command.framework.ArgumentHandler;
 import dev.rosewood.rosegarden.command.framework.CommandContext;
 import dev.rosewood.rosegarden.command.framework.InputIterator;
-import dev.rosewood.rosegarden.utils.StringPlaceholders;
-
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class MuteDurationArgumentHandler extends ArgumentHandler<Integer> {
+public class MuteDurationArgumentHandler extends ArgumentHandler<MuteDuration> {
 
-    private final Map<String, String> localisedTimescales;
+    private final Map<String, Unit> localisedTimescales;
 
     public MuteDurationArgumentHandler() {
-        super(Integer.class);
-
+        super(MuteDuration.class);
         LocaleManager localeManager = RoseChat.getInstance().getManager(LocaleManager.class);
-        this.localisedTimescales = new HashMap<>(){{
-            this.put(localeManager.getMessage("command-mute-seconds"), "seconds");
-            this.put(localeManager.getMessage("command-mute-second"), "second");
-            this.put(localeManager.getMessage("command-mute-minutes"), "minutes");
-            this.put(localeManager.getMessage("command-mute-minute"), "minute");
-            this.put(localeManager.getMessage("command-mute-hours"), "hours");
-            this.put(localeManager.getMessage("command-mute-hour"), "hour");
-            this.put(localeManager.getMessage("command-mute-days"), "days");
-            this.put(localeManager.getMessage("command-mute-day"), "day");
-            this.put(localeManager.getMessage("command-mute-months"), "months");
-            this.put(localeManager.getMessage("command-mute-month"), "month");
-            this.put(localeManager.getMessage("command-mute-years"), "years");
-            this.put(localeManager.getMessage("command-mute-year"), "year");
-        }};
+        this.localisedTimescales = new HashMap<>();
+        this.add(localeManager, Unit.SECOND);
+        this.add(localeManager, Unit.MINUTE);
+        this.add(localeManager, Unit.HOUR);
+        this.add(localeManager, Unit.DAY);
+        this.add(localeManager, Unit.MONTH);
+        this.add(localeManager, Unit.YEAR);
     }
 
     @Override
-    public Integer handle(CommandContext context, Argument argument, InputIterator inputIterator) throws HandledArgumentException {
-        String timeInput = inputIterator.next();
+    public MuteDuration handle(CommandContext context, Argument argument, InputIterator inputIterator)
+            throws HandledArgumentException {
+        String amountInput = inputIterator.next();
         String timescaleInput = inputIterator.next();
-
         if (timescaleInput.isEmpty())
             throw new HandledArgumentException("command-mute-scale-required");
 
-        int time;
+        int amount;
         try {
-            time = Integer.parseInt(timeInput);
-        } catch (Exception e) {
+            amount = Integer.parseInt(amountInput);
+        } catch (NumberFormatException exception) {
             throw new HandledArgumentException("argument-handler-integer");
         }
-
-        // Convert the localised timescale into something we can use.
-        String internalTimescale = this.localisedTimescales.get(timescaleInput);
-        if (internalTimescale == null) {
+        Unit unit = this.localisedTimescales.get(timescaleInput);
+        if (unit == null)
             throw new HandledArgumentException("argument-handler-timescale");
-        }
-
-        return time;
+        if (amount < 1)
+            throw new HandledArgumentException("argument-handler-integer");
+        return new MuteDuration(amount, unit);
     }
 
     @Override
     public List<String> suggest(CommandContext context, Argument argument, String[] args) {
-        if (args.length == 0 || args.length == 1) {
-            return List.of("<time>");
-        } else {
-            return this.localisedTimescales.keySet().stream().toList();
-        }
+        return args.length <= 1 ? List.of("<time>") : List.copyOf(this.localisedTimescales.keySet());
     }
 
+    private void add(LocaleManager localeManager, Unit unit) {
+        this.localisedTimescales.put(localeManager.getMessage("command-mute-" + unit.name().toLowerCase()), unit);
+        this.localisedTimescales.put(localeManager.getMessage("command-mute-" + unit.name().toLowerCase() + "s"), unit);
+    }
 }
-

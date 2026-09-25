@@ -14,7 +14,7 @@ public class RoseChatArgumentHandlers {
     public static final ArgumentHandler<Channel> CHANNEL = new ChannelArgumentHandler(true);
     public static final ArgumentHandler<String> CHAT_COLOR = new ChatColorArgumentHandler(PermissionArea.CHATCOLOR);
     public static final ArgumentHandler<UUID> UUID = new UUIDArgumentHandler();
-    public static final ArgumentHandler<Integer> MUTE_DURATION = new MuteDurationArgumentHandler();
+    public static final ArgumentHandler<MuteDuration> MUTE_DURATION = new MuteDurationArgumentHandler();
     public static final ArgumentHandler<GroupChannel> GROUP_CHAT = new GroupArgumentHandler(true);
     public static final ArgumentHandler<GroupChannel> MEMBER_GROUP = new MemberGroupArgumentHandler();
     public static final ArgumentHandler<RosePlayer> GROUP_MEMBER = new GroupMemberArgumentHandler();
