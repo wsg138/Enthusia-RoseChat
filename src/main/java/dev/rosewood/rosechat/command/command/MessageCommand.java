@@ -120,7 +120,7 @@ public class MessageCommand extends RoseChatCommand {
         return targetHidden(
                 sender.getUUID(),
                 target.getUniqueId(),
-                (subjectId, viewerId) -> staffService.canRenderPresence(subjectId, viewerId, PresenceType.TAB)
+                (subjectId, viewerId) -> staffService.canRenderPresence(subjectId, viewerId, PresenceType.JOIN)
         );
     }
 
