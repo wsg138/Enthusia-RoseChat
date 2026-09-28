@@ -238,7 +238,9 @@ public class ChannelManager extends Manager {
             Field bukkitCommandMap = Bukkit.getServer().getClass().getDeclaredField("commandMap");
             bukkitCommandMap.setAccessible(true);
             CommandMap commandMap = (CommandMap) bukkitCommandMap.get(Bukkit.getServer());
-            commandMap.register(command, new CustomChannelCommand(command));
+            commandMap.register(
+                    EnthusiaStaffCommandCompatibility.fallbackPrefix(),
+                    new CustomChannelCommand(command));
         } catch (Exception e) {
             e.printStackTrace();
         }

@@ -36,6 +36,18 @@ public class CommandManager extends AbstractCommandManager {
     }
 
     @Override
+    public void reload() {
+        boolean staffInstalled = EnthusiaStaffCommandCompatibility.staffInstalled(
+                this.rosePlugin.getServer().getPluginManager());
+        for (String command : EnthusiaStaffCommandCompatibility.normalizePersistedPriorities(
+                this.rosePlugin.getDataFolder(), staffInstalled)) {
+            this.rosePlugin.getLogger().info(
+                    "Yielding /" + command + " priority to EnthusiaStaff; RoseChat remains available by namespace");
+        }
+        super.reload();
+    }
+
+    @Override
     public List<Function<RosePlugin, BaseRoseCommand>> getRootCommands() {
         return List.of(
                 BaseCommand::new,
