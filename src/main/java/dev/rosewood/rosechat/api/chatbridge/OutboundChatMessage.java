@@ -31,11 +31,17 @@ public record OutboundChatMessage(
         String plainText
 ) {
 
+    /**
+     * Source side of the message used for loop suppression.
+     */
     public enum Origin {
         MINECRAFT,
         DISCORD
     }
 
+    /**
+     * Validates the immutable outbound message contract at construction time.
+     */
     public OutboundChatMessage {
         if (eventId == null
                 || logicalChannelId == null || logicalChannelId.isBlank()
@@ -49,6 +55,12 @@ public record OutboundChatMessage(
         }
     }
 
+    /**
+     * Checks whether this best-effort message has aged out.
+     *
+     * @param nowEpochMillis current time in epoch milliseconds
+     * @return {@code true} when the message must no longer be delivered
+     */
     public boolean isExpired(long nowEpochMillis) {
         return nowEpochMillis > this.expiresAtEpochMillis;
     }
