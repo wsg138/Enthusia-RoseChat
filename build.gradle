@@ -64,8 +64,9 @@ repositories {
 }
 
 dependencies {
-    api 'dev.rosewood:rosegarden:1.5.4'
+    api 'dev.rosewood:rosegarden:1.5.7'
     api 'org.apache.commons:commons-text:1.12.0'
+    implementation 'com.google.code.gson:gson:2.11.0'
 
     compileOnly 'net.kyori:adventure-api:4.25.0'
     compileOnly 'net.md-5:bungeecord-chat:1.21-R0.5-20251216.193400-13'
@@ -127,9 +128,10 @@ processResources {
 }
 
 shadowJar {
-    archiveClassifier.set(null);
+    archiveClassifier.set(null)
     relocate('dev.rosewood.rosegarden', 'dev.rosewood.rosechat.lib.rosegarden')
     relocate('org.apache', 'dev.rosewood.rosechat.lib.apache')
+    relocate('com.google.gson', 'dev.rosewood.rosechat.lib.gson')
     minimize()
 }
 

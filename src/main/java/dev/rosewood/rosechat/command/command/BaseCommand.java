@@ -21,7 +21,8 @@ public class BaseCommand extends PrimaryCommand {
                         .optionalSub(
                                 new HelpCommand(this.rosePlugin, this),
                                 new ReloadCommand(this.rosePlugin),
-                                new DebugCommand(this.rosePlugin)
+                                new DebugCommand(this.rosePlugin),
+                                new AiCommand(this.rosePlugin)
                         ))
                 .build();
     }

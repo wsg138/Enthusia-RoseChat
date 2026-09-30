@@ -45,6 +45,7 @@ import dev.rosewood.rosechat.manager.LocaleManager;
 import dev.rosewood.rosechat.manager.PlaceholderManager;
 import dev.rosewood.rosechat.manager.PlayerDataManager;
 import dev.rosewood.rosechat.message.tokenizer.filter.HeldItemTokenizer;
+import dev.rosewood.rosechat.moderation.ai.AiModerationManager;
 import dev.rosewood.rosechat.staff.RoseChatStaffServiceImpl;
 import dev.rosewood.rosegarden.RosePlugin;
 import dev.rosewood.rosegarden.config.SettingHolder;
@@ -77,6 +78,7 @@ public class RoseChat extends RosePlugin {
     private ConsoleMessageLog consoleLog;
     private ChatLogTask chatLogTask;
     private RoseChatStaffServiceImpl staffService;
+    private AiModerationManager aiModerationManager;
 
     public RoseChat() {
         super(-1, 5608,
@@ -118,6 +120,9 @@ public class RoseChat extends RosePlugin {
                 this,
                 ServicePriority.Normal
         );
+
+        this.aiModerationManager = new AiModerationManager(this);
+        pluginManager.registerEvents(this.aiModerationManager, this);
 
         new HeldItemTokenizer();
     }
@@ -174,10 +179,18 @@ public class RoseChat extends RosePlugin {
                 Bukkit.getLogger().warning("An error occurred while creating a chat log.");
             }
         }
+
+        if (this.aiModerationManager != null)
+            this.aiModerationManager.reload();
     }
 
     @Override
     public void disable() {
+        if (this.aiModerationManager != null) {
+            this.aiModerationManager.close();
+            this.aiModerationManager = null;
+        }
+
         if (this.staffService != null) {
             this.getServer().getServicesManager().unregister(RoseChatStaffService.class, this.staffService);
             this.staffService.close();
@@ -302,6 +315,10 @@ public class RoseChat extends RosePlugin {
         return this.staffService;
     }
 
+    public AiModerationManager getAiModerationManager() {
+        return this.aiModerationManager;
+    }
+
     @Override
     protected SettingHolder getRoseConfigSettingHolder() {
         return Settings.INSTANCE;
@@ -323,5 +340,4 @@ public class RoseChat extends RosePlugin {
     public static RoseChat getInstance() {
         return instance;
     }
-
 }

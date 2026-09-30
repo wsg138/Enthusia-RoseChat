@@ -1,5 +1,6 @@
 package dev.rosewood.rosechat.listener;
 
+import dev.rosewood.rosechat.RoseChat;
 import dev.rosewood.rosechat.api.RoseChatAPI;
 import dev.rosewood.rosechat.chat.PlayerData;
 import dev.rosewood.rosechat.chat.channel.Channel;
@@ -111,7 +112,7 @@ public class ChatListener implements Listener {
                         .format(format)
                         .sendToDiscord(true)
                         .build();
-                channel.send(options);
+                this.send(channel, options);
 
                 if (Settings.UPDATE_DISPLAY_NAMES.get())
                     player.updateDisplayName();
@@ -143,9 +144,17 @@ public class ChatListener implements Listener {
                 .sender(player)
                 .message(message)
                 .build();
-        channel.send(options);
+        this.send(channel, options);
         if (Settings.UPDATE_DISPLAY_NAMES.get())
             player.updateDisplayName();
     }
 
+    private void send(Channel channel, ChannelMessageOptions options) {
+        RoseChat plugin = RoseChat.getInstance();
+        if (plugin.getAiModerationManager() == null) {
+            channel.send(options);
+            return;
+        }
+        plugin.getAiModerationManager().moderateAndSend(channel, options);
+    }
 }

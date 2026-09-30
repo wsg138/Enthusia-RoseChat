@@ -1,0 +1,44 @@
+# Optional OpenAI chat moderation. Chat always fails open if this subsystem is unavailable.
+enabled: false
+shadow-mode: true
+model: omni-moderation-latest
+
+# Put the OpenAI API key here if you do not want to configure an environment variable.
+# Keep this file private and never commit a real key to GitHub.
+api-key: ''
+
+# Optional fallback. Used only when api-key above is blank.
+api-key-environment-variable: OPENAI_API_KEY
+maximum-chat-hold-ms: 300
+request-timeout-ms: 2000
+
+context:
+  before-messages: 6
+  after-messages: 3
+  max-age-seconds: 45
+  max-characters: 3500
+  follow-up-delay-ms: 1500
+
+circuit-breaker:
+  failures-to-open: 3
+  open-seconds: 60
+
+strikes:
+  required: 2
+  window-minutes: 60
+  mute-days: 30
+
+policy:
+  corroboration-floor-ratio: 0.75
+  harassment: 0.92
+  harassment-threatening: 0.78
+  hate: 0.82
+  hate-threatening: 0.70
+  self-harm-instructions: 0.80
+  sexual-minors: 0.65
+  violence-graphic: 0.92
+  illicit-violent: 0.92
+  self-harm-intent-alert: 0.55
+
+# Reuse RoseChat's existing staff-facing blocked-message permission by default.
+staff-status-permission: rosechat.seeblocked
