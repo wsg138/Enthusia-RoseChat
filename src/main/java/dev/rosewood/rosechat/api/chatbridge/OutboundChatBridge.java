@@ -9,6 +9,11 @@ package dev.rosewood.rosechat.api.chatbridge;
 @FunctionalInterface
 public interface OutboundChatBridge {
 
+    /**
+     * Publishes one already-approved outbound chat message.
+     *
+     * @param message bounded message to export
+     */
     void publish(OutboundChatMessage message);
 
 }
