@@ -5,6 +5,7 @@ import java.util.Objects;
 
 public final class AiModerationPolicy {
     private static final String SELF_HARM_INTENT = "self-harm/intent";
+    private static final String HARASSMENT = "harassment";
 
     private final AiModerationConfig config;
 
@@ -56,7 +57,13 @@ public final class AiModerationPolicy {
             double targetScore = target.score(category);
             double contextScore = context.score(category);
             boolean direct = targetScore >= required;
-            boolean corroborated = targetScore >= required * config.corroborationFloorRatio()
+
+            // Plain harassment is intentionally target-only. Minecraft chat is often noisy and
+            // mildly insulting, so surrounding toxic context must not turn a low-severity line
+            // such as "you suck" into a DELETE decision. Threats, hate, sexual/minor content,
+            // and the other higher-risk categories can still use bounded context corroboration.
+            boolean corroborated = !HARASSMENT.equals(category)
+                    && targetScore >= required * config.corroborationFloorRatio()
                     && contextScore >= required;
             if (!direct && !corroborated) {
                 continue;

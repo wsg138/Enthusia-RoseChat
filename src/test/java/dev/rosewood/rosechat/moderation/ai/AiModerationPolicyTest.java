@@ -49,6 +49,31 @@ class AiModerationPolicyTest {
     }
 
     @Test
+    void plainHarassmentCannotBePromotedByToxicContext() {
+        AiModerationPolicy.Verdict verdict = policy.evaluate(batch(
+                true,
+                Map.of("harassment", 0.80),
+                Map.of("harassment", 0.99)
+        ));
+
+        assertEquals(AiModerationPolicy.Action.ALLOW, verdict.action());
+        assertEquals("harassment", verdict.category());
+        assertTrue(verdict.followUpUseful());
+    }
+
+    @Test
+    void directSevereHarassmentStillDeletes() {
+        AiModerationPolicy.Verdict verdict = policy.evaluate(batch(
+                true,
+                Map.of("harassment", 0.99),
+                Map.of("harassment", 0.20)
+        ));
+
+        assertEquals(AiModerationPolicy.Action.DELETE, verdict.action());
+        assertEquals("harassment", verdict.category());
+    }
+
+    @Test
     void borderlineEnforceableCategoryRequestsFollowUpContext() {
         AiModerationPolicy.Verdict verdict = policy.evaluate(batch(
                 false,
@@ -61,7 +86,7 @@ class AiModerationPolicyTest {
     }
 
     @Test
-    void contextCanCorroborateAlreadyBorderlineTarget() {
+    void contextCanCorroborateAlreadyBorderlineThreat() {
         AiModerationPolicy.Verdict verdict = policy.evaluate(batch(
                 true,
                 Map.of("harassment/threatening", 0.65),

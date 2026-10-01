@@ -36,6 +36,8 @@ public record AiModerationConfig(
     static final Duration REQUIRED_AUTOMATIC_MUTE_DURATION = Duration.ofDays(30);
     private static final String RESOURCE = "ai-moderation.yml";
     private static final String DEFAULT_MODEL = "omni-moderation-latest";
+    private static final String DEFAULT_STAFF_STATUS_PERMISSION = "rosechat.ai.alerts";
+    private static final String LEGACY_STAFF_STATUS_PERMISSION = "rosechat.seeblocked";
     private static final String INVALID_CONFIG_ENVIRONMENT_VARIABLE = "__ROSECHAT_AI_CONFIG_INVALID__";
 
     public AiModerationConfig {
@@ -98,7 +100,7 @@ public record AiModerationConfig(
         }
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
         Map<String, Double> thresholds = new LinkedHashMap<>();
-        thresholds.put("harassment", yaml.getDouble("policy.harassment", 0.92));
+        thresholds.put("harassment", yaml.getDouble("policy.harassment", 0.97));
         thresholds.put("harassment/threatening", yaml.getDouble("policy.harassment-threatening", 0.78));
         thresholds.put("hate", yaml.getDouble("policy.hate", 0.82));
         thresholds.put("hate/threatening", yaml.getDouble("policy.hate-threatening", 0.70));
@@ -128,13 +130,13 @@ public record AiModerationConfig(
                 boundedThreshold("corroboration-floor-ratio", yaml.getDouble("policy.corroboration-floor-ratio", 0.75)),
                 thresholds,
                 boundedThreshold("self-harm-intent-alert", yaml.getDouble("policy.self-harm-intent-alert", 0.55)),
-                nonBlank(yaml.getString("staff-status-permission"), "rosechat.seeblocked")
+                staffPermission(yaml.getString("staff-status-permission"))
         );
     }
 
     private static AiModerationConfig invalidConfigurationFallback() {
         Map<String, Double> thresholds = new LinkedHashMap<>();
-        thresholds.put("harassment", 0.92);
+        thresholds.put("harassment", 0.97);
         thresholds.put("harassment/threatening", 0.78);
         thresholds.put("hate", 0.82);
         thresholds.put("hate/threatening", 0.70);
@@ -163,7 +165,7 @@ public record AiModerationConfig(
                 0.75,
                 thresholds,
                 0.55,
-                "rosechat.seeblocked"
+                DEFAULT_STAFF_STATUS_PERMISSION
         );
     }
 
@@ -172,6 +174,14 @@ public record AiModerationConfig(
             throw new IllegalArgumentException("AI moderation threshold " + key + " must be in (0, 1]");
         }
         return value;
+    }
+
+    private static String staffPermission(String value) {
+        String permission = nonBlank(value, DEFAULT_STAFF_STATUS_PERMISSION);
+        if (LEGACY_STAFF_STATUS_PERMISSION.equalsIgnoreCase(permission)) {
+            return DEFAULT_STAFF_STATUS_PERMISSION;
+        }
+        return permission;
     }
 
     private static String nonBlank(String value, String fallback) {
