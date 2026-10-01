@@ -257,6 +257,9 @@ public final class RoseChatStaffServiceImpl implements RoseChatStaffService, Aut
     }
 
     public boolean canRenderPresence(UUID subjectId, UUID viewerId, PresenceType type) {
+        if (this.bridge.owner().isEmpty() && StaffVisibilityPolicy.isCanonicalVisibilityRequired()) {
+            return false;
+        }
         return this.bridge.canRenderPresence(new PresenceContext(subjectId, viewerId, type));
     }
 

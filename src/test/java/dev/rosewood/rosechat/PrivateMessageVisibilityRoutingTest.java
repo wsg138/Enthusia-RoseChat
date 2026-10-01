@@ -46,6 +46,15 @@ class PrivateMessageVisibilityRoutingTest {
         );
     }
 
+    @Test
+    void presenceRenderingFailsClosedWhenStaffRequiresCanonicalAuthority() throws IOException {
+        String source = readSource("staff/RoseChatStaffServiceImpl.java");
+        assertTrue(
+                source.contains("this.bridge.owner().isEmpty() && StaffVisibilityPolicy.isCanonicalVisibilityRequired()"),
+                "Presence rendering must fail closed while EnthusiaStaff requires an unavailable canonical bridge"
+        );
+    }
+
     private static String readSource(String relativePath) throws IOException {
         return Files.readString(Path.of("src/main/java/dev/rosewood/rosechat").resolve(relativePath));
     }
