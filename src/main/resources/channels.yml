@@ -34,17 +34,13 @@ global:
 #  servers:
 #    - factions
 
-# Staff Channel - /c staff or /staff
+# Staff Channel - use /c staff. EnthusiaStaff owns /staff for staff mode
+# and /staffchat for the convenient staff-channel toggle.
 staff:
   formats:
     chat: '{channel-prefix}{player}{separator}{message}'
 
   visible-anywhere: true
-
-  # Creates a command alias, /staff, for this channel.
-  # A restart is required for this command to be available.
-  commands:
-    - staff
 
 
 # Local Channel - /c local
