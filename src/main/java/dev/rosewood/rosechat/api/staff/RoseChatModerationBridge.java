@@ -21,6 +21,6 @@ public interface RoseChatModerationBridge {
     }
 
     default boolean canRenderPresence(PresenceContext context) {
-        return true;
+        return false;
     }
 }
