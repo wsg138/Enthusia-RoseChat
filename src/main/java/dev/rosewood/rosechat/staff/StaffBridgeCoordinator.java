@@ -1,5 +1,6 @@
 package dev.rosewood.rosechat.staff;
 
+import dev.rosewood.rosechat.RoseChat;
 import dev.rosewood.rosechat.api.staff.BridgeRegistration;
 import dev.rosewood.rosechat.api.staff.BroadcastContext;
 import dev.rosewood.rosechat.api.staff.ChannelClassification;
@@ -14,6 +15,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -24,10 +26,16 @@ final class StaffBridgeCoordinator implements AutoCloseable {
 
     private final AtomicReference<InstalledBridge> installed;
     private final Logger logger;
+    private final Predicate<PresenceContext> presenceRenderer;
     private volatile boolean closed;
 
     StaffBridgeCoordinator(Logger logger) {
+        this(logger, context -> PresenceMessageRenderer.render(RoseChat.getInstance(), context));
+    }
+
+    StaffBridgeCoordinator(Logger logger, Predicate<PresenceContext> presenceRenderer) {
         this.logger = Objects.requireNonNull(logger, "logger");
+        this.presenceRenderer = Objects.requireNonNull(presenceRenderer, "presenceRenderer");
         this.installed = new AtomicReference<>();
     }
 
@@ -188,6 +196,18 @@ final class StaffBridgeCoordinator implements AutoCloseable {
         return ModerationDecision.block(CALLBACK_FAILURE_FEEDBACK);
     }
 
+    private boolean renderPresence(InstalledBridge owner, PresenceContext context) {
+        Objects.requireNonNull(context, "context");
+        if (this.closed || this.installed.get() != owner)
+            return false;
+        try {
+            return this.presenceRenderer.test(context);
+        } catch (RuntimeException | LinkageError exception) {
+            this.logCallbackFailure(owner, "renderPresence", exception);
+            return false;
+        }
+    }
+
     private void logCallbackFailure(InstalledBridge current, String callback, Throwable exception) {
         this.logger.log(
                 Level.WARNING,
@@ -219,6 +239,11 @@ final class StaffBridgeCoordinator implements AutoCloseable {
         @Override
         public boolean isActive() {
             return StaffBridgeCoordinator.this.installed.get() == this.bridge;
+        }
+
+        @Override
+        public boolean renderPresence(PresenceContext context) {
+            return StaffBridgeCoordinator.this.renderPresence(this.bridge, context);
         }
 
         @Override
