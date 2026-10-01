@@ -2,6 +2,7 @@ package dev.rosewood.rosechat.listener;
 
 import dev.rosewood.rosechat.RoseChat;
 import dev.rosewood.rosechat.manager.BungeeManager;
+import dev.rosewood.rosechat.staff.StaffVisibilityPolicy;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -78,6 +79,8 @@ public class BungeeListener implements PluginMessageListener {
                     String json = data.readUTF();
                     String rcMessage = data.readUTF();
                     UUID messageId = data.available() > 0 ? UUID.fromString(data.readUTF()) : null;
+                    if (!this.canDeliverDirectMessage(bungeeManager, player, sender, senderUUID, messageId))
+                        return;
                     bungeeManager.receiveDirectMessage(player, sender, senderUUID, group, permissions, messageId, json, rcMessage);
                 }
                 case "direct_message_result" -> {
@@ -109,6 +112,21 @@ public class BungeeListener implements PluginMessageListener {
         } catch (IOException | IllegalArgumentException e) {
             this.plugin.getLogger().warning("Ignoring malformed RoseChat Bungee message: " + e.getMessage());
         }
+    }
+
+    private boolean canDeliverDirectMessage(
+            BungeeManager bungeeManager,
+            Player target,
+            String sender,
+            UUID senderUUID,
+            UUID messageId
+    ) {
+        if (StaffVisibilityPolicy.canSee(senderUUID, target))
+            return true;
+
+        if (messageId != null)
+            bungeeManager.sendDirectMessageResult(sender, messageId, false);
+        return false;
     }
 
 }

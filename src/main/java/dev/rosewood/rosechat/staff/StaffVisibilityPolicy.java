@@ -17,13 +17,17 @@ public final class StaffVisibilityPolicy {
         if (!(viewer instanceof Player viewerPlayer))
             return true;
 
+        return canSee(viewerPlayer.getUniqueId(), subject);
+    }
+
+    public static boolean canSee(UUID viewerId, Player subject) {
         RoseChatStaffServiceImpl staffService = RoseChat.getInstance().getStaffService();
         boolean canonicalVisibility = staffService != null && staffService.getBridgeOwner().isPresent();
         BiPredicate<UUID, UUID> visibility = canonicalVisibility
-                ? (subjectId, viewerId) -> staffService.canRenderPresence(subjectId, viewerId, PresenceType.JOIN)
-                : (subjectId, viewerId) -> true;
+                ? (subjectId, subjectViewerId) -> staffService.canRenderPresence(subjectId, subjectViewerId, PresenceType.JOIN)
+                : (subjectId, subjectViewerId) -> true;
         return canSee(
-                viewerPlayer.getUniqueId(),
+                viewerId,
                 subject.getUniqueId(),
                 MessageUtils.isPlayerVanished(subject),
                 canonicalVisibility,
@@ -43,6 +47,8 @@ public final class StaffVisibilityPolicy {
             boolean canonicalVisibility,
             BiPredicate<UUID, UUID> visibility
     ) {
+        if (viewerId == null)
+            return !canonicalVisibility && !legacyVanished;
         if (viewerId.equals(subjectId))
             return true;
         if (canonicalVisibility)

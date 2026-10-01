@@ -52,4 +52,18 @@ class MessageCommandVisibilityTest {
         assertTrue(StaffVisibilityPolicy.canSee(SUBJECT, SUBJECT, true, true,
                 (subjectId, viewerId) -> false));
     }
+
+    @Test
+    void unverifiableRemoteViewerFailsClosedWithCanonicalVisibility() {
+        assertFalse(StaffVisibilityPolicy.canSee(null, SUBJECT, false, true,
+                (subjectId, viewerId) -> true));
+    }
+
+    @Test
+    void unverifiableRemoteViewerUsesLegacyFallbackWithoutBridge() {
+        assertTrue(StaffVisibilityPolicy.canSee(null, SUBJECT, false, false,
+                (subjectId, viewerId) -> false));
+        assertFalse(StaffVisibilityPolicy.canSee(null, SUBJECT, true, false,
+                (subjectId, viewerId) -> true));
+    }
 }
