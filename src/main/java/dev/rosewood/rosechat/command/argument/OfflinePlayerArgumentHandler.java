@@ -45,7 +45,7 @@ public class OfflinePlayerArgumentHandler extends ArgumentHandler<String> {
                 .toList());
 
         if (this.withBungeePlayers
-                && !StaffVisibilityPolicy.hasCanonicalVisibility()
+                && !StaffVisibilityPolicy.isCanonicalVisibilityRequired()
                 && RoseChatAPI.getInstance().isBungee()) {
             addRemoteSuggestions(context, suggestions);
         }

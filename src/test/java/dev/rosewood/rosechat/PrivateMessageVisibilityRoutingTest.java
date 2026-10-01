@@ -36,6 +36,16 @@ class PrivateMessageVisibilityRoutingTest {
                 "Private-message delivery must re-check current visibility at the receive event boundary"
         );
     }
+
+    @Test
+    void completionFailsClosedWhenCanonicalStaffVisibilityIsRequired() throws IOException {
+        String source = readSource("command/argument/OfflinePlayerArgumentHandler.java");
+        assertTrue(
+                source.contains("!StaffVisibilityPolicy.isCanonicalVisibilityRequired()"),
+                "Bungee completion must stay disabled while the Staff provider requires canonical visibility"
+        );
+    }
+
     private static String readSource(String relativePath) throws IOException {
         return Files.readString(Path.of("src/main/java/dev/rosewood/rosechat").resolve(relativePath));
     }

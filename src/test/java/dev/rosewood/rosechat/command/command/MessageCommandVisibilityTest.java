@@ -20,50 +20,60 @@ class MessageCommandVisibilityTest {
                 SUBJECT,
                 false,
                 true,
+                true,
                 (subjectId, viewerId) -> !subjectId.equals(SUBJECT) || !viewerId.equals(VIEWER)
         ));
     }
 
     @Test
     void authorizedViewerCanAddressVanishedSubject() {
-        assertTrue(StaffVisibilityPolicy.canSee(VIEWER, SUBJECT, true, true, (subjectId, viewerId) -> true));
+        assertTrue(StaffVisibilityPolicy.canSee(VIEWER, SUBJECT, true, true, true,
+                (subjectId, viewerId) -> true));
     }
 
     @Test
     void visibilityIsReevaluatedAfterVanishStateChanges() {
         AtomicBoolean visible = new AtomicBoolean(true);
-        assertTrue(StaffVisibilityPolicy.canSee(VIEWER, SUBJECT, false, true,
+        assertTrue(StaffVisibilityPolicy.canSee(VIEWER, SUBJECT, false, true, true,
                 (subjectId, viewerId) -> visible.get()));
         visible.set(false);
-        assertFalse(StaffVisibilityPolicy.canSee(VIEWER, SUBJECT, false, true,
+        assertFalse(StaffVisibilityPolicy.canSee(VIEWER, SUBJECT, false, true, true,
                 (subjectId, viewerId) -> visible.get()));
     }
 
     @Test
-    void legacyMetadataRemainsFallbackWithoutStaffBridge() {
-        assertFalse(StaffVisibilityPolicy.canSee(VIEWER, SUBJECT, true, false,
+    void legacyMetadataRemainsFallbackWithoutStaffProvider() {
+        assertFalse(StaffVisibilityPolicy.canSee(VIEWER, SUBJECT, true, false, false,
                 (subjectId, viewerId) -> true));
-        assertTrue(StaffVisibilityPolicy.canSee(VIEWER, SUBJECT, false, false,
+        assertTrue(StaffVisibilityPolicy.canSee(VIEWER, SUBJECT, false, false, false,
                 (subjectId, viewerId) -> false));
     }
 
     @Test
+    void installedStaffProviderWithoutBridgeFailsClosed() {
+        assertFalse(StaffVisibilityPolicy.canSee(VIEWER, SUBJECT, false, true, false,
+                (subjectId, viewerId) -> true));
+        assertFalse(StaffVisibilityPolicy.canSee(null, SUBJECT, false, true, false,
+                (subjectId, viewerId) -> true));
+    }
+
+    @Test
     void subjectCanAlwaysAddressSelf() {
-        assertTrue(StaffVisibilityPolicy.canSee(SUBJECT, SUBJECT, true, true,
+        assertTrue(StaffVisibilityPolicy.canSee(SUBJECT, SUBJECT, true, true, false,
                 (subjectId, viewerId) -> false));
     }
 
     @Test
     void unverifiableRemoteViewerFailsClosedWithCanonicalVisibility() {
-        assertFalse(StaffVisibilityPolicy.canSee(null, SUBJECT, false, true,
+        assertFalse(StaffVisibilityPolicy.canSee(null, SUBJECT, false, true, true,
                 (subjectId, viewerId) -> true));
     }
 
     @Test
-    void unverifiableRemoteViewerUsesLegacyFallbackWithoutBridge() {
-        assertTrue(StaffVisibilityPolicy.canSee(null, SUBJECT, false, false,
+    void unverifiableRemoteViewerUsesLegacyFallbackWithoutStaffProvider() {
+        assertTrue(StaffVisibilityPolicy.canSee(null, SUBJECT, false, false, false,
                 (subjectId, viewerId) -> false));
-        assertFalse(StaffVisibilityPolicy.canSee(null, SUBJECT, true, false,
+        assertFalse(StaffVisibilityPolicy.canSee(null, SUBJECT, true, false, false,
                 (subjectId, viewerId) -> true));
     }
 }
