@@ -25,7 +25,6 @@ softdepend:
   - MarriageMaster
   - InteractiveChat
   - HuskTowns
-  - EnthusiaStaff
 permissions:
   rosechat.*:
     description: Inherits all plugin permissions.
