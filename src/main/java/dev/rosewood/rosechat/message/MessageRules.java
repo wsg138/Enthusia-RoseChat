@@ -16,53 +16,32 @@ import org.bukkit.ChatColor;
 
 public class MessageRules {
 
-    // Rules
     private boolean filterCaps;
     private boolean filterSpam;
     private boolean filterURLs;
     private boolean filterLanguage;
     private boolean ignoreMessageLogging;
 
-    public MessageRules() {
-
-    }
-
-    /**
-     * Checks if the sender has permission, and applies a capital letter filter if not.
-     */
     public MessageRules applyCapsFilter() {
         this.filterCaps = true;
         return this;
     }
 
-    /**
-     * Checks if the sender has permission, and applies a spam filter if not.
-     */
     public MessageRules applySpamFilter() {
         this.filterSpam = true;
         return this;
     }
 
-    /**
-     * Checks if the sender has permission, and applies a URL filter if not.
-     */
     public MessageRules applyURLFilter() {
         this.filterURLs = true;
         return this;
     }
 
-    /**
-     * Checks if the sender has permission, and applies a language filter if not.
-     */
     public MessageRules applyLanguageFilter() {
         this.filterLanguage = true;
         return this;
     }
 
-    /**
-     * Applies all the filters.
-     * Recommended for chat messages.
-     */
     public MessageRules applyAllFilters() {
         this.filterCaps = true;
         this.filterSpam = true;
@@ -71,9 +50,6 @@ public class MessageRules {
         return this;
     }
 
-    /**
-     * Disables message logging for the message.
-     */
     public MessageRules ignoreMessageLogging() {
         this.ignoreMessageLogging = true;
         return this;
@@ -156,61 +132,70 @@ public class MessageRules {
             outputs.setBlocked(true);
     }
 
+    /**
+     * Lenient deterministic fallback used alongside AI moderation. This deliberately avoids fuzzy
+     * edit-distance matching, which caused innocent words such as "reward" and "restart" to collide
+     * with configured blocked terms. Punctuation inside a token is removed so obvious bypasses such
+     * as f.u.c.k still match an explicitly configured word.
+     */
     private void filterLanguage(RoseMessage message, RuleOutputs outputs) {
-        String strippedMessage = ChatColor.stripColor(HexUtils.colorify(MessageUtils.stripAccents(outputs.getFilteredMessage().toLowerCase())));
+        List<String> messageTokens = normalizedTokens(outputs.getFilteredMessage());
+        if (messageTokens.isEmpty())
+            return;
 
         for (Filter filter : RoseChatAPI.getInstance().getFilters()) {
             if (!filter.block() || !filter.hasPermission(message.getSender()))
                 continue;
 
-            // Exact match if sensitivity is 0.
-            if (filter.sensitivity() == 0) {
-                for (String word : outputs.getFilteredMessage().toLowerCase().split(" ")) {
-                    for (String blocked : filter.matches()) {
-                        if (word.equalsIgnoreCase(blocked)) {
-                            if (filter.message() != null)
-                                outputs.setWarningMessage(filter.message());
+            for (String blocked : filter.matches()) {
+                List<String> blockedTokens = normalizedTokens(blocked);
+                if (blockedTokens.isEmpty() || !containsSequence(messageTokens, blockedTokens))
+                    continue;
 
-                            if (filter.notifyStaff())
-                                outputs.setNotifyStaff(true);
+                if (filter.message() != null)
+                    outputs.setWarningMessage(filter.message());
 
-                            outputs.setBlocked(true);
+                if (filter.notifyStaff())
+                    outputs.setNotifyStaff(true);
 
-                            outputs.getServerCommands().addAll(filter.serverCommands());
-                            outputs.getPlayerCommands().addAll(filter.playerCommands());
-                            return;
-                        }
-                    }
-                }
-            } else {
-                for (String word : strippedMessage.split(" ")) {
-                    for (String blocked : filter.matches()) {
-                        double difference = MessageUtils.getLevenshteinDistancePercent(blocked, word);
-
-                        if ((1 - difference) <= filter.sensitivity() / 100.0) {
-                            if (filter.message() != null)
-                                outputs.setWarningMessage(filter.message());
-
-                            if (filter.notifyStaff())
-                                outputs.setNotifyStaff(true);
-
-                            outputs.setBlocked(true);
-
-                            outputs.getServerCommands().addAll(filter.serverCommands());
-                            outputs.getPlayerCommands().addAll(filter.playerCommands());
-                            return;
-                        }
-                    }
-                }
+                outputs.setBlocked(true);
+                outputs.getServerCommands().addAll(filter.serverCommands());
+                outputs.getPlayerCommands().addAll(filter.playerCommands());
+                return;
             }
         }
     }
 
-    /**
-     * Applies filters and settings based on the set rules.
-     * @param message The message to edit and get information from.
-     * @param originalMessage The original message sent by the player.
-     */
+    private static List<String> normalizedTokens(String input) {
+        String stripped = ChatColor.stripColor(HexUtils.colorify(
+                MessageUtils.stripAccents(input.toLowerCase())));
+        List<String> result = new ArrayList<>();
+        for (String raw : stripped.split("\\s+")) {
+            String normalized = raw.replaceAll("[^a-z0-9]", "");
+            if (!normalized.isBlank())
+                result.add(normalized);
+        }
+        return result;
+    }
+
+    private static boolean containsSequence(List<String> input, List<String> wanted) {
+        if (wanted.size() > input.size())
+            return false;
+
+        for (int start = 0; start <= input.size() - wanted.size(); start++) {
+            boolean matches = true;
+            for (int offset = 0; offset < wanted.size(); offset++) {
+                if (!input.get(start + offset).equals(wanted.get(offset))) {
+                    matches = false;
+                    break;
+                }
+            }
+            if (matches)
+                return true;
+        }
+        return false;
+    }
+
     public RuleOutputs apply(RoseMessage message, String originalMessage) {
         RuleOutputs outputs = new RuleOutputs(originalMessage);
         if (this.filterSpam)
@@ -242,15 +227,11 @@ public class MessageRules {
         return this.apply(RoseMessage.forLocation(rosePlayer, messageLocation), originalMessage);
     }
 
-    /**
-     * @return True if the rules dictate ignoring message logging.
-     */
     public boolean isIgnoringMessageLogging() {
         return this.ignoreMessageLogging;
     }
 
     public static class RuleOutputs {
-
         private boolean blocked;
         private FilterWarning warning;
         private String warningMessage;
@@ -312,7 +293,5 @@ public class MessageRules {
         public void transformMessage(Function<String, String> transformer) {
             this.message = transformer.apply(this.message);
         }
-
     }
-
 }

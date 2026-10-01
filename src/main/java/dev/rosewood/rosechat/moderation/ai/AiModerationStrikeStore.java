@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
@@ -25,7 +26,7 @@ final class AiModerationStrikeStore {
     private final Clock clock;
     private final Duration window;
     private final Logger logger;
-    private final Map<UUID, Deque<Instant>> strikes = new HashMap<>();
+    private final Map<UUID, Deque<StrikeEvidence>> strikes = new HashMap<>();
 
     AiModerationStrikeStore(Path file, Clock clock, Duration window, Logger logger) {
         this.file = Objects.requireNonNull(file, "file");
@@ -38,22 +39,47 @@ final class AiModerationStrikeStore {
         load();
     }
 
-    synchronized int record(UUID playerId) {
+    synchronized RecordResult record(
+            UUID playerId,
+            UUID eventId,
+            String message,
+            String category,
+            double confidence,
+            int severity
+    ) {
         Objects.requireNonNull(playerId, "playerId");
+        Objects.requireNonNull(eventId, "eventId");
+        Objects.requireNonNull(message, "message");
+        Objects.requireNonNull(category, "category");
         Instant now = clock.instant();
         pruneAll(now);
-        Deque<Instant> playerStrikes = strikes.computeIfAbsent(playerId, ignored -> new ArrayDeque<>());
-        playerStrikes.addLast(now);
+        Deque<StrikeEvidence> playerStrikes = strikes.computeIfAbsent(playerId, ignored -> new ArrayDeque<>());
+        playerStrikes.addLast(new StrikeEvidence(now, eventId, message, category, confidence, severity));
         save();
-        return playerStrikes.size();
+        List<StrikeEvidence> enforcementEvidence = latestEnforcementEvidence(playerStrikes);
+        return new RecordResult(enforcementEvidence.size(), enforcementEvidence);
     }
 
     synchronized int count(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
         Instant now = clock.instant();
         pruneAll(now);
-        Deque<Instant> playerStrikes = strikes.get(playerId);
+        Deque<StrikeEvidence> playerStrikes = strikes.get(playerId);
         return playerStrikes == null ? 0 : playerStrikes.size();
+    }
+
+    synchronized List<StrikeEvidence> evidence(UUID playerId) {
+        Objects.requireNonNull(playerId, "playerId");
+        Instant now = clock.instant();
+        pruneAll(now);
+        Deque<StrikeEvidence> playerStrikes = strikes.get(playerId);
+        return playerStrikes == null ? List.of() : List.copyOf(playerStrikes);
+    }
+
+    private static List<StrikeEvidence> latestEnforcementEvidence(Deque<StrikeEvidence> playerStrikes) {
+        List<StrikeEvidence> allEvidence = List.copyOf(playerStrikes);
+        int first = Math.max(0, allEvidence.size() - AiModerationConfig.REQUIRED_AUTOMATIC_MUTE_STRIKES);
+        return List.copyOf(allEvidence.subList(first, allEvidence.size()));
     }
 
     private void load() {
@@ -67,29 +93,27 @@ final class AiModerationStrikeStore {
                 if (line.isEmpty() || line.startsWith("#")) {
                     continue;
                 }
-                int separator = line.indexOf('\t');
-                if (separator <= 0 || separator == line.length() - 1) {
+                String[] fields = line.split("\\t", -1);
+                // Intentionally ignore the old timestamp-only ledger format. Automatic mutes must
+                // never be triggered by strikes that do not have reviewable message evidence.
+                if (fields.length != 7) {
                     continue;
                 }
-                UUID playerId;
                 try {
-                    playerId = UUID.fromString(line.substring(0, separator));
-                } catch (IllegalArgumentException ignored) {
-                    continue;
-                }
-                Deque<Instant> loaded = new ArrayDeque<>();
-                for (String rawTimestamp : line.substring(separator + 1).split(",")) {
-                    try {
-                        Instant timestamp = Instant.ofEpochMilli(Long.parseLong(rawTimestamp.trim()));
-                        if (!timestamp.isAfter(now) && !timestamp.isBefore(now.minus(window))) {
-                            loaded.addLast(timestamp);
-                        }
-                    } catch (IllegalArgumentException ignored) {
-                        // Ignore one corrupt timestamp instead of losing the rest of the ledger.
+                    UUID playerId = UUID.fromString(fields[0]);
+                    Instant at = Instant.ofEpochMilli(Long.parseLong(fields[1]));
+                    UUID eventId = UUID.fromString(fields[2]);
+                    double confidence = Double.parseDouble(fields[3]);
+                    int severity = Integer.parseInt(fields[4]);
+                    String category = decoded(fields[5]);
+                    String message = decoded(fields[6]);
+                    if (at.isAfter(now) || at.isBefore(now.minus(window)) || message.isBlank()) {
+                        continue;
                     }
-                }
-                if (!loaded.isEmpty()) {
-                    strikes.put(playerId, loaded);
+                    strikes.computeIfAbsent(playerId, ignored -> new ArrayDeque<>())
+                            .addLast(new StrikeEvidence(at, eventId, message, category, confidence, severity));
+                } catch (RuntimeException ignored) {
+                    // Ignore one corrupt row instead of discarding the rest of the ledger.
                 }
             }
         } catch (IOException exception) {
@@ -101,9 +125,9 @@ final class AiModerationStrikeStore {
     private void pruneAll(Instant now) {
         Instant cutoff = now.minus(window);
         List<UUID> empty = new ArrayList<>();
-        for (Map.Entry<UUID, Deque<Instant>> entry : strikes.entrySet()) {
-            Deque<Instant> playerStrikes = entry.getValue();
-            while (!playerStrikes.isEmpty() && playerStrikes.peekFirst().isBefore(cutoff)) {
+        for (Map.Entry<UUID, Deque<StrikeEvidence>> entry : strikes.entrySet()) {
+            Deque<StrikeEvidence> playerStrikes = entry.getValue();
+            while (!playerStrikes.isEmpty() && playerStrikes.peekFirst().at().isBefore(cutoff)) {
                 playerStrikes.removeFirst();
             }
             if (playerStrikes.isEmpty()) {
@@ -119,20 +143,21 @@ final class AiModerationStrikeStore {
             if (parent != null) {
                 Files.createDirectories(parent);
             }
-            List<Map.Entry<UUID, Deque<Instant>>> entries = new ArrayList<>(strikes.entrySet());
+            List<Map.Entry<UUID, Deque<StrikeEvidence>>> entries = new ArrayList<>(strikes.entrySet());
             entries.sort(Comparator.comparing(entry -> entry.getKey().toString()));
-            StringBuilder contents = new StringBuilder("# RoseChat AI moderation rolling strike timestamps (epoch milliseconds)\n");
-            for (Map.Entry<UUID, Deque<Instant>> entry : entries) {
-                contents.append(entry.getKey()).append('\t');
-                boolean first = true;
-                for (Instant timestamp : entry.getValue()) {
-                    if (!first) {
-                        contents.append(',');
-                    }
-                    first = false;
-                    contents.append(timestamp.toEpochMilli());
+            StringBuilder contents = new StringBuilder(
+                    "# player_uuid\\tepoch_ms\\tevent_uuid\\tconfidence\\tseverity\\tcategory_b64\\tmessage_b64\n"
+            );
+            for (Map.Entry<UUID, Deque<StrikeEvidence>> entry : entries) {
+                for (StrikeEvidence evidence : entry.getValue()) {
+                    contents.append(entry.getKey()).append('\t')
+                            .append(evidence.at().toEpochMilli()).append('\t')
+                            .append(evidence.eventId()).append('\t')
+                            .append(evidence.confidence()).append('\t')
+                            .append(evidence.severity()).append('\t')
+                            .append(encoded(evidence.category())).append('\t')
+                            .append(encoded(evidence.message())).append('\n');
                 }
-                contents.append('\n');
             }
             Path temp = file.resolveSibling(file.getFileName() + ".tmp");
             Files.writeString(temp, contents, StandardCharsets.UTF_8);
@@ -146,6 +171,42 @@ final class AiModerationStrikeStore {
         } catch (IOException exception) {
             logger.warning("Could not persist AI moderation strike ledger; the current in-memory window remains active: "
                     + exception.getClass().getSimpleName());
+        }
+    }
+
+    private static String encoded(String value) {
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String decoded(String value) {
+        return new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8);
+    }
+
+    record StrikeEvidence(
+            Instant at,
+            UUID eventId,
+            String message,
+            String category,
+            double confidence,
+            int severity
+    ) {
+        StrikeEvidence {
+            Objects.requireNonNull(at, "at");
+            Objects.requireNonNull(eventId, "eventId");
+            Objects.requireNonNull(message, "message");
+            Objects.requireNonNull(category, "category");
+            if (!Double.isFinite(confidence) || confidence < 0.0D || confidence > 1.0D) {
+                throw new IllegalArgumentException("confidence must be in [0, 1]");
+            }
+            if (severity < 0 || severity > 100) {
+                throw new IllegalArgumentException("severity must be in [0, 100]");
+            }
+        }
+    }
+
+    record RecordResult(int count, List<StrikeEvidence> evidence) {
+        RecordResult {
+            evidence = List.copyOf(evidence);
         }
     }
 }

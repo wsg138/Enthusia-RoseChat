@@ -26,7 +26,7 @@ Run one suite with:
 
 HTML test results are written to `build/reports/tests/test/`; machine-readable XML is under `build/test-results/test/`.
 
-The canonical GitHub Actions workflow also downloads the deployed LumaGuilds 2.1.13 API and rebuilds/tests RoseChat against it before verifying the shaded JAR.
+The canonical GitHub Actions workflow builds RoseChat independently from LumaGuilds and verifies that the shaded JAR does not contain a RoseChat-owned LumaGuilds channel provider or any `net/lumalyte/lg` classes.
 
 ## Automated coverage currently present
 
@@ -77,7 +77,7 @@ RoseChat is not yet exhaustively automated. The following are priority families 
 9. **Join/leave messages** — selection, placeholders, disabled/default behavior and reloads.
 10. **Placeholder conditions** — Boolean, Number, String, Null, Compound and nested condition evaluation beyond the raw operator enum.
 11. **Discord/DiscordSRV** — Minecraft↔Discord parsing, emoji/tags/channels/spoilers, webhook/message formatting and missing-provider behavior.
-12. **Optional channel providers** — LumaGuilds, Towny, mcMMO, WorldGuard, Factions, KingdomsX, HuskTowns, BentoBox, SuperiorSkyblock, SimpleClans, MarriageMaster and others.
+12. **Optional channel providers** - Towny, mcMMO, WorldGuard, Factions, KingdomsX, HuskTowns, BentoBox, SuperiorSkyblock, SimpleClans, MarriageMaster and others. LumaGuilds 3.x is intentionally inverted: it registers its provider into RoseChat at runtime.
 13. **Commands and argument handlers** — success, permission denial, malformed input, completions and state mutation for every registered command.
 14. **Message deletion** — Adventure/Bungee deletion helper behavior and delete-command authorization/history edges.
 15. **Signs and packets** — sign formatting and ProtocolLib packet-level behavior.
@@ -90,12 +90,10 @@ Workers adding one of these feature families should add real behavioral tests an
 
 `.github/workflows/build.yml` is the canonical PR gate. It:
 
-1. compiles against the fallback embedded LumaGuilds API surface;
-2. downloads the deployed LumaGuilds 2.1.13 JAR;
-3. runs `clean test shadowJar` against that deployed API;
-4. verifies tests actually executed and none were skipped/failed/errored;
-5. verifies required Staff/LumaGuilds integration classes are packaged and server/consumer APIs are not shaded incorrectly;
-6. uploads the built RoseChat JAR.
+1. runs `clean test shadowJar` without a LumaGuilds compile dependency;
+2. verifies tests actually executed and none were skipped/failed/errored;
+3. verifies the Staff API is packaged while RoseChat-owned LumaGuilds provider classes and server/consumer APIs are absent;
+4. uploads the built RoseChat JAR.
 
 Interpret failures as follows:
 

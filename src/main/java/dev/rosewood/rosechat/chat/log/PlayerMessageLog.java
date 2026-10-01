@@ -24,17 +24,38 @@ public class PlayerMessageLog extends ConsoleMessageLog {
     }
 
     /**
+     * Checks the current spam history without mutating it. This is used before remote AI moderation
+     * so messages the local spam filter is already certain to reject do not consume API requests.
+     */
+    public boolean wouldMessageBeSpam(String messageToAdd) {
+        this.cleanupAmount = Settings.SPAM_MESSAGE_COUNT.get();
+        if (this.cleanupAmount <= 1) {
+            return false;
+        }
+        synchronized (this.messages) {
+            if (this.messages.size() < this.cleanupAmount - 1) {
+                return false;
+            }
+            int similarMessages = 1; // The candidate would match itself after insertion.
+            int checked = Math.min(this.cleanupAmount - 1, this.messages.size());
+            for (int i = 0; i < checked; i++) {
+                String message = this.messages.get((this.messages.size() - 1) - i);
+                double difference = MessageUtils.getLevenshteinDistancePercent(message, messageToAdd);
+                if ((1 - difference) <= (Settings.SPAM_FILTER_SENSITIVITY.get() / 100.0D)) {
+                    similarMessages++;
+                }
+            }
+            return similarMessages >= this.cleanupAmount;
+        }
+    }
+
+    /**
      * @param messageToAdd The message that was sent.
      * @return True if it is seen as spam.
      */
     public boolean addMessageWithSpamCheck(String messageToAdd) {
-        // Refresh the cleanup amount, as it can be changed during a reload.
         this.cleanupAmount = Settings.SPAM_MESSAGE_COUNT.get();
 
-        // The add + similarity scan + trim must be atomic: this runs on both the
-        // main thread (regular chat) and async threads (InteractiveChat's
-        // redispatched AsyncPlayerChatEvent), so concurrent sends on the same
-        // log used to race -> ConcurrentModificationException on the subList trim.
         synchronized (this.messages) {
             this.addMessage(messageToAdd);
 
@@ -45,11 +66,10 @@ public class PlayerMessageLog extends ConsoleMessageLog {
                     String message = this.messages.get((this.messages.size() - 1) - i);
                     double difference = MessageUtils.getLevenshteinDistancePercent(message, messageToAdd);
 
-                    if ((1 - difference) <= (Settings.SPAM_FILTER_SENSITIVITY.get() / 100))
+                    if ((1 - difference) <= (Settings.SPAM_FILTER_SENSITIVITY.get() / 100.0D))
                         similarMessages++;
                 }
 
-                // Let's maybe not have an array size of... BIG.
                 if (this.messages.size() > this.cleanupAmount * 2)
                     this.messages.subList(0, this.cleanupAmount).clear();
 

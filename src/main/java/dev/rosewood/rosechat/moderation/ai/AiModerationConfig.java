@@ -11,6 +11,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 public record AiModerationConfig(
         boolean enabled,
         boolean shadowMode,
+        boolean punishmentsEnabled,
         String model,
         String apiKeyEnvironmentVariable,
         Duration maximumChatHold,
@@ -30,7 +31,11 @@ public record AiModerationConfig(
         double selfHarmIntentAlertThreshold,
         String staffStatusPermission
 ) {
+    static final int REQUIRED_AUTOMATIC_MUTE_STRIKES = 2;
+    static final Duration REQUIRED_AUTOMATIC_MUTE_WINDOW = Duration.ofHours(1);
+    static final Duration REQUIRED_AUTOMATIC_MUTE_DURATION = Duration.ofDays(30);
     private static final String RESOURCE = "ai-moderation.yml";
+    private static final String DEFAULT_MODEL = "omni-moderation-2024-09-26";
     private static final String INVALID_CONFIG_ENVIRONMENT_VARIABLE = "__ROSECHAT_AI_CONFIG_INVALID__";
 
     public AiModerationConfig {
@@ -55,8 +60,17 @@ public record AiModerationConfig(
         if (beforeMessages < 0 || afterMessages < 0 || contextMaxCharacters < 256) {
             throw new IllegalArgumentException("invalid AI moderation context bounds");
         }
-        if (failuresToOpen < 1 || requiredStrikes < 1) {
-            throw new IllegalArgumentException("invalid AI moderation failure/strike settings");
+        if (failuresToOpen < 1) {
+            throw new IllegalArgumentException("invalid AI moderation circuit-breaker settings");
+        }
+        if (requiredStrikes != REQUIRED_AUTOMATIC_MUTE_STRIKES) {
+            throw new IllegalArgumentException("strikes.required must be 2 to match the EnthusiaStaff automatic-mute policy");
+        }
+        if (!REQUIRED_AUTOMATIC_MUTE_WINDOW.equals(strikeWindow)) {
+            throw new IllegalArgumentException("strikes.window-minutes must be 60 to match the EnthusiaStaff automatic-mute policy");
+        }
+        if (!REQUIRED_AUTOMATIC_MUTE_DURATION.equals(muteDuration)) {
+            throw new IllegalArgumentException("strikes.mute-days must be 30 to match the EnthusiaStaff automatic-mute policy");
         }
         if (corroborationFloorRatio <= 0 || corroborationFloorRatio > 1) {
             throw new IllegalArgumentException("corroboration-floor-ratio must be in (0, 1]");
@@ -96,9 +110,10 @@ public record AiModerationConfig(
         return new AiModerationConfig(
                 yaml.getBoolean("enabled", false),
                 yaml.getBoolean("shadow-mode", true),
-                nonBlank(yaml.getString("model"), "omni-moderation-latest"),
+                yaml.getBoolean("punishments.enabled", false),
+                nonBlank(yaml.getString("model"), DEFAULT_MODEL),
                 nonBlank(yaml.getString("api-key-environment-variable"), "OPENAI_API_KEY"),
-                Duration.ofMillis(yaml.getLong("maximum-chat-hold-ms", 300)),
+                Duration.ofMillis(yaml.getLong("maximum-chat-hold-ms", 200)),
                 Duration.ofMillis(yaml.getLong("request-timeout-ms", 2000)),
                 yaml.getInt("context.before-messages", 6),
                 yaml.getInt("context.after-messages", 3),
@@ -107,9 +122,9 @@ public record AiModerationConfig(
                 Duration.ofMillis(yaml.getLong("context.follow-up-delay-ms", 1500)),
                 yaml.getInt("circuit-breaker.failures-to-open", 3),
                 Duration.ofSeconds(yaml.getLong("circuit-breaker.open-seconds", 60)),
-                yaml.getInt("strikes.required", 2),
-                Duration.ofMinutes(yaml.getLong("strikes.window-minutes", 60)),
-                Duration.ofDays(yaml.getLong("strikes.mute-days", 30)),
+                yaml.getInt("strikes.required", REQUIRED_AUTOMATIC_MUTE_STRIKES),
+                Duration.ofMinutes(yaml.getLong("strikes.window-minutes", REQUIRED_AUTOMATIC_MUTE_WINDOW.toMinutes())),
+                Duration.ofDays(yaml.getLong("strikes.mute-days", REQUIRED_AUTOMATIC_MUTE_DURATION.toDays())),
                 boundedThreshold("corroboration-floor-ratio", yaml.getDouble("policy.corroboration-floor-ratio", 0.75)),
                 thresholds,
                 boundedThreshold("self-harm-intent-alert", yaml.getDouble("policy.self-harm-intent-alert", 0.55)),
@@ -130,7 +145,8 @@ public record AiModerationConfig(
         return new AiModerationConfig(
                 true,
                 true,
-                "omni-moderation-latest",
+                false,
+                DEFAULT_MODEL,
                 INVALID_CONFIG_ENVIRONMENT_VARIABLE,
                 Duration.ZERO,
                 Duration.ofSeconds(2),
@@ -141,9 +157,9 @@ public record AiModerationConfig(
                 Duration.ofMillis(1500),
                 3,
                 Duration.ofSeconds(60),
-                2,
-                Duration.ofHours(1),
-                Duration.ofDays(30),
+                REQUIRED_AUTOMATIC_MUTE_STRIKES,
+                REQUIRED_AUTOMATIC_MUTE_WINDOW,
+                REQUIRED_AUTOMATIC_MUTE_DURATION,
                 0.75,
                 thresholds,
                 0.55,

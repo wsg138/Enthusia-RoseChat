@@ -92,6 +92,10 @@ public class ChannelManager extends Manager {
             this.worldGuardTask.cancel();
             this.worldGuardTask = null;
         }
+
+        this.channels.clear();
+        this.worldGuardChannels.clear();
+        this.defaultChannel = null;
     }
 
     /**
@@ -127,7 +131,9 @@ public class ChannelManager extends Manager {
      * Uses the registered {@link ChannelProvider}s to decide channel configuration.
      */
     public void generateChannels() {
-        this.channels.clear();
+        // Do not clear channels here: providers may be registered dynamically after RoseChat enables
+        // (for example LumaGuilds 3.x). Full cleanup belongs to disable(); regeneration updates the
+        // configured channels in place so a reload cannot discard an externally registered provider.
         this.worldGuardChannels.clear();
         this.defaultChannel = null;
 

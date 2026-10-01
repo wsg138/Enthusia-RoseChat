@@ -19,11 +19,6 @@ import org.bukkit.inventory.ItemStack;
 
 public class ChatListener implements Listener {
 
-    /**
-     * Metadata key set by another plugin (e.g. LumaGuilds) to claim a chat message
-     * for routing into its own channel. RoseChat consumes the marker and skips its
-     * pipeline so the message isn't double-broadcast to main chat.
-     */
     private static final String CHAT_CLAIM_META = "lumaguilds:chat_claimed";
 
     private final RoseChatAPI api;
@@ -55,7 +50,6 @@ public class ChatListener implements Listener {
         if (NMSUtil.getVersionNumber() >= 19 && Settings.ALLOW_CHAT_SUGGESTIONS.get())
             player.validateChatCompletion();
 
-        // Don't send the message if the player doesn't have permission.
         if (!player.hasPermission("rosechat.chat")) {
             player.sendLocaleMessage("no-permission");
             return;
@@ -66,13 +60,11 @@ public class ChatListener implements Listener {
             return;
         }
 
-        // Check if the player is muted.
         if (data.isMuted() && !player.hasPermission("rosechat.mute.bypass")) {
             player.sendLocaleMessage("command-mute-cannot-send");
             return;
         }
 
-        // Don't send the message if the player is using [item] and isn't holding an item.
         String heldItemFilter = Settings.HELD_ITEM_FILTER.get();
         if (heldItemFilter != null && player.isPlayer()) {
             Filter filter = this.api.getFilterById(heldItemFilter);
@@ -89,7 +81,6 @@ public class ChatListener implements Listener {
             }
         }
 
-        // Check if the message is using a shout command and send the message if they are.
         for (Channel channel : this.api.getChannels()) {
             if (channel.getSettings().getShoutCommands().isEmpty())
                 continue;
@@ -120,12 +111,10 @@ public class ChatListener implements Listener {
             }
         }
 
-        // Get the channel that the message should be sent to.
         Channel channel = data.getActiveChannel();
         if (channel == null)
             channel = data.getCurrentChannel();
 
-        // If the player is somehow not in a channel, find the appropriate channel to put them in.
         if (channel == null) {
             channel = player.findChannel();
             if (channel == null) {
@@ -155,6 +144,16 @@ public class ChatListener implements Listener {
             channel.send(options);
             return;
         }
+
+        if (Settings.SPAM_CHECKING_ENABLED.get()
+                && options.sender() != null
+                && options.sender().getPlayerData() != null
+                && options.sender().getPlayerData().getMessageLog().wouldMessageBeSpam(options.message())) {
+            // Let the normal local RoseChat rule path reject the message without spending an API call.
+            channel.send(options);
+            return;
+        }
+
         plugin.getAiModerationManager().moderateAndSend(channel, options);
     }
 }

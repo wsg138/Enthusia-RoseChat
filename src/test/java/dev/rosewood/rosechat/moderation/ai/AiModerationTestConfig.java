@@ -21,6 +21,7 @@ final class AiModerationTestConfig {
         return new AiModerationConfig(
                 true,
                 false,
+                true,
                 "omni-moderation-latest",
                 "OPENAI_API_KEY",
                 Duration.ofMillis(300),

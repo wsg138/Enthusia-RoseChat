@@ -5,6 +5,7 @@ import dev.rosewood.rosechat.RoseChat;
 import dev.rosewood.rosechat.command.RoseChatCommand;
 import dev.rosewood.rosechat.moderation.ai.AiModerationConfig;
 import dev.rosewood.rosechat.moderation.ai.AiModerationManager;
+import dev.rosewood.rosechat.moderation.ai.AiModerationMetrics;
 import dev.rosewood.rosechat.moderation.ai.AiModerationPolicy;
 import dev.rosewood.rosechat.moderation.ai.ModerationScores;
 import dev.rosewood.rosechat.moderation.ai.OpenAiModerationClient;
@@ -55,7 +56,8 @@ public class AiCommand extends RoseChatCommand {
 
         sender.sendMessage("--- RoseChat AI Moderation ---");
         sender.sendMessage("Enabled: " + config.enabled());
-        sender.sendMessage("Mode: " + (config.shadowMode() ? "SHADOW (no enforcement)" : "ENFORCING"));
+        sender.sendMessage("Mode: " + (config.shadowMode() ? "SHADOW (no message enforcement)" : "ENFORCING MESSAGES"));
+        sender.sendMessage("Punishments: " + (config.punishmentsEnabled() ? "ENABLED" : "DISABLED (no strikes/mutes)"));
         sender.sendMessage("Model: " + config.model());
         sender.sendMessage("API key: " + (key.key().isBlank() ? "MISSING" : "configured via " + key.source()));
 
@@ -69,11 +71,26 @@ public class AiCommand extends RoseChatCommand {
             }
             sender.sendMessage("Health: " + status);
             sender.sendMessage("Detail: " + health.detail());
+
+            AiModerationMetrics.Snapshot metrics = manager.metrics();
+            sender.sendMessage("Requests: " + metrics.requests()
+                    + " | success=" + metrics.successes()
+                    + " | failed=" + metrics.failures()
+                    + " | locally limited=" + metrics.rateLimited());
+            sender.sendMessage("Decisions: allow=" + metrics.allows()
+                    + " | alert=" + metrics.alerts()
+                    + " | delete=" + metrics.deletes()
+                    + " (late=" + metrics.lateDeletes() + ")"
+                    + " | shadow flags=" + metrics.shadowFlags());
+            sender.sendMessage("Latency: p50=" + metrics.p50LatencyMs() + "ms"
+                    + " | p95=" + metrics.p95LatencyMs() + "ms"
+                    + " | p99=" + metrics.p99LatencyMs() + "ms");
         }
 
         sender.sendMessage("Max chat hold: " + config.maximumChatHold().toMillis() + "ms");
         sender.sendMessage("Use /rosechat ai test to verify OpenAI now.");
         sender.sendMessage("Use /rosechat ai inspect <message> to see scores without enforcing.");
+        sender.sendMessage("Inspect samples append to plugins/RoseChat/ai-moderation-calibration.jsonl.");
     }
 
     static CompletableFuture<ProbeResult> probe(RoseChat plugin, String message) {

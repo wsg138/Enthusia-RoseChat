@@ -55,10 +55,10 @@ local:
   # The radius is the distance, in blocks, between players that can read the messages that are sent.
   radius: 200
 
-# Guild Channel - /c guild (requires LumaGuilds)
+# Guild Channel - /c guild (provider is registered by LumaGuilds 3.x at runtime)
 # Uncomment to activate. Players auto-join on guild join when auto-join is true.
 #guild:
-#  # REQUIRED: tells RoseChat to use the LumaGuildsChannelProvider for this entry.
+#  # REQUIRED: selects the ChannelProvider registered by LumaGuilds 3.x at runtime.
 #  # Without this line the channel falls back to a plain RoseChat channel and
 #  # broadcasts to all online players regardless of guild membership.
 #  plugin: LumaGuilds
