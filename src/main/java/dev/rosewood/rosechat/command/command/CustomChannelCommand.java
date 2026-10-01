@@ -2,13 +2,13 @@ package dev.rosewood.rosechat.command.command;
 
 import dev.rosewood.rosechat.api.RoseChatAPI;
 import dev.rosewood.rosechat.chat.channel.Channel;
-import dev.rosewood.rosechat.manager.LocaleManager;
 import dev.rosewood.rosechat.message.RosePlayer;
 import dev.rosewood.rosegarden.utils.StringPlaceholders;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandSender;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
 
 public class CustomChannelCommand extends Command {
 
@@ -20,9 +20,10 @@ public class CustomChannelCommand extends Command {
     public boolean execute(CommandSender sender, String label, String[] args) {
         RosePlayer player = new RosePlayer(sender);
         RoseChatAPI api = RoseChatAPI.getInstance();
+        String commandName = this.channelLookupName();
 
         for (Channel channel : api.getChannels()) {
-            if (!channel.getSettings().getCommands().contains(label.toLowerCase()))
+            if (!channel.getSettings().getCommands().contains(commandName))
                 continue;
 
             if (!player.hasPermission("rosechat.channel." + channel.getId())) {
@@ -60,6 +61,10 @@ public class CustomChannelCommand extends Command {
         }
 
         return false;
+    }
+
+    String channelLookupName() {
+        return this.getName().toLowerCase(Locale.ROOT);
     }
 
     @Override

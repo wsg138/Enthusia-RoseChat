@@ -9,6 +9,7 @@ import dev.rosewood.rosegarden.command.framework.CommandContext;
 import dev.rosewood.rosegarden.command.framework.InputIterator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public class MuteDurationArgumentHandler extends ArgumentHandler<MuteDuration> {
@@ -55,7 +56,12 @@ public class MuteDurationArgumentHandler extends ArgumentHandler<MuteDuration> {
     }
 
     private void add(LocaleManager localeManager, Unit unit) {
-        this.localisedTimescales.put(localeManager.getMessage("command-mute-" + unit.name().toLowerCase()), unit);
-        this.localisedTimescales.put(localeManager.getMessage("command-mute-" + unit.name().toLowerCase() + "s"), unit);
+        String key = unitKey(unit);
+        this.localisedTimescales.put(localeManager.getMessage("command-mute-" + key), unit);
+        this.localisedTimescales.put(localeManager.getMessage("command-mute-" + key + "s"), unit);
+    }
+
+    static String unitKey(Unit unit) {
+        return unit.name().toLowerCase(Locale.ROOT);
     }
 }
