@@ -27,6 +27,15 @@ class PrivateMessageVisibilityRoutingTest {
         );
     }
 
+    @Test
+    void finalDeliveryRechecksVisibilityAfterAsyncWork() throws IOException {
+        String source = readSource("listener/PlayerListener.java");
+        assertTrue(
+                source.contains("event instanceof PlayerReceiveMessageEvent receiveEvent")
+                        && source.contains("StaffVisibilityPolicy.canSee(sender.getUUID(), receiver.asPlayer())"),
+                "Private-message delivery must re-check current visibility at the receive event boundary"
+        );
+    }
     private static String readSource(String relativePath) throws IOException {
         return Files.readString(Path.of("src/main/java/dev/rosewood/rosechat").resolve(relativePath));
     }

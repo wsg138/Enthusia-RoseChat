@@ -2,6 +2,8 @@ package dev.rosewood.rosechat.listener;
 
 import dev.rosewood.rosechat.RoseChat;
 import dev.rosewood.rosechat.api.RoseChatAPI;
+import dev.rosewood.rosechat.api.event.player.PlayerMessageEvent;
+import dev.rosewood.rosechat.api.event.player.PlayerReceiveMessageEvent;
 import dev.rosewood.rosechat.api.staff.PresenceType;
 import dev.rosewood.rosechat.chat.PlayerData;
 import dev.rosewood.rosechat.chat.channel.Channel;
@@ -11,6 +13,7 @@ import dev.rosewood.rosechat.manager.ChannelManager;
 import dev.rosewood.rosechat.manager.PlayerDataManager;
 import dev.rosewood.rosechat.message.RosePlayer;
 import dev.rosewood.rosechat.staff.PresenceMessageRenderer;
+import dev.rosewood.rosechat.staff.StaffVisibilityPolicy;
 import dev.rosewood.rosegarden.utils.NMSUtil;
 import dev.rosewood.rosegarden.utils.StringPlaceholders;
 import java.util.ArrayList;
@@ -162,6 +165,20 @@ public class PlayerListener implements Listener {
                         StringPlaceholders.of("name", group.getName()));
             }
         }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPrivateMessageVisibility(PlayerMessageEvent event) {
+        if (!(event instanceof PlayerReceiveMessageEvent receiveEvent))
+            return;
+
+        RosePlayer receiver = receiveEvent.getReceiver();
+        RosePlayer sender = receiveEvent.getSender();
+        if (!receiver.isPlayer() || sender.getUUID() == null)
+            return;
+
+        if (!StaffVisibilityPolicy.canSee(sender.getUUID(), receiver.asPlayer()))
+            receiveEvent.setCancelled(true);
     }
 
     @EventHandler
