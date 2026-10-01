@@ -3,7 +3,9 @@ package dev.rosewood.rosechat.command.command;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.rosewood.rosechat.staff.StaffVisibilityPolicy;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
 class MessageCommandVisibilityTest {
@@ -12,16 +14,42 @@ class MessageCommandVisibilityTest {
     private static final UUID SUBJECT = UUID.fromString("00000000-0000-0000-0000-000000000102");
 
     @Test
-    void hiddenTargetUsesVisibilityWithSubjectAndViewerInTheCorrectOrder() {
-        assertTrue(MessageCommand.targetHidden(
+    void canonicalVisibilityUsesSubjectAndViewerInCorrectOrder() {
+        assertFalse(StaffVisibilityPolicy.canSee(
                 VIEWER,
                 SUBJECT,
+                false,
+                true,
                 (subjectId, viewerId) -> !subjectId.equals(SUBJECT) || !viewerId.equals(VIEWER)
         ));
     }
 
     @Test
-    void visibleTargetRemainsAddressable() {
-        assertFalse(MessageCommand.targetHidden(VIEWER, SUBJECT, (subjectId, viewerId) -> true));
+    void authorizedViewerCanAddressVanishedSubject() {
+        assertTrue(StaffVisibilityPolicy.canSee(VIEWER, SUBJECT, true, true, (subjectId, viewerId) -> true));
+    }
+
+    @Test
+    void visibilityIsReevaluatedAfterVanishStateChanges() {
+        AtomicBoolean visible = new AtomicBoolean(true);
+        assertTrue(StaffVisibilityPolicy.canSee(VIEWER, SUBJECT, false, true,
+                (subjectId, viewerId) -> visible.get()));
+        visible.set(false);
+        assertFalse(StaffVisibilityPolicy.canSee(VIEWER, SUBJECT, false, true,
+                (subjectId, viewerId) -> visible.get()));
+    }
+
+    @Test
+    void legacyMetadataRemainsFallbackWithoutStaffBridge() {
+        assertFalse(StaffVisibilityPolicy.canSee(VIEWER, SUBJECT, true, false,
+                (subjectId, viewerId) -> true));
+        assertTrue(StaffVisibilityPolicy.canSee(VIEWER, SUBJECT, false, false,
+                (subjectId, viewerId) -> false));
+    }
+
+    @Test
+    void subjectCanAlwaysAddressSelf() {
+        assertTrue(StaffVisibilityPolicy.canSee(SUBJECT, SUBJECT, true, true,
+                (subjectId, viewerId) -> false));
     }
 }
