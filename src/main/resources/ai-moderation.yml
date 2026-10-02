@@ -40,15 +40,21 @@ strikes:
 
 policy:
   corroboration-floor-ratio: 0.75
-  harassment: 0.92
+  # Plain harassment is intentionally conservative for Minecraft chat. Unlike the
+  # higher-risk categories below, surrounding context cannot promote this category
+  # into a DELETE decision; the message itself must clear this threshold.
+  harassment: 0.97
   harassment-threatening: 0.78
   hate: 0.82
   hate-threatening: 0.70
-  self-harm-instructions: 0.80
+  # Slightly lower so abusive shorthand such as KYS crosses the instruction threshold.
+  self-harm-instructions: 0.75
   sexual-minors: 0.65
   violence-graphic: 0.92
   illicit-violent: 0.92
-  self-harm-intent-alert: 0.55
+  # Higher than the first rollout to avoid Minecraft phrases such as "kill me bro"
+  # while still surfacing strong first-person self-harm intent for staff review.
+  self-harm-intent-alert: 0.85
 
-# Reuse RoseChat's existing staff-facing blocked-message permission by default.
-staff-status-permission: rosechat.seeblocked
+# Dedicated permission for AI moderation staff notices. Do not grant this to normal players.
+staff-status-permission: rosechat.ai.alerts

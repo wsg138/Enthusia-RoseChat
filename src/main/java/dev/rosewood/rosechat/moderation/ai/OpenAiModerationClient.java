@@ -43,7 +43,8 @@ public final class OpenAiModerationClient {
                 .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(body)))
                 .build();
         return http.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenApply(this::parseResponse);
+                .thenApply(this::parseResponse)
+                .thenApply(batch -> new BatchResult(targetMessage, batch.target(), batch.context()));
     }
 
     BatchResult parseResponse(HttpResponse<String> response) {
@@ -103,7 +104,7 @@ public final class OpenAiModerationClient {
             if (results.size() != 2) {
                 throw new ModerationRequestException("OpenAI moderation response returned " + results.size() + " results; expected 2");
             }
-            return new BatchResult(results.get(0), results.get(1));
+            return new BatchResult("", results.get(0), results.get(1));
         } catch (ModerationRequestException exception) {
             throw exception;
         } catch (RuntimeException exception) {
@@ -130,10 +131,15 @@ public final class OpenAiModerationClient {
         return new ModerationScores(result.get("flagged").getAsBoolean(), categories, scores);
     }
 
-    public record BatchResult(ModerationScores target, ModerationScores context) {
+    public record BatchResult(String targetMessage, ModerationScores target, ModerationScores context) {
         public BatchResult {
+            targetMessage = targetMessage == null ? "" : targetMessage;
             Objects.requireNonNull(target, "target");
             Objects.requireNonNull(context, "context");
+        }
+
+        public BatchResult(ModerationScores target, ModerationScores context) {
+            this("", target, context);
         }
     }
 

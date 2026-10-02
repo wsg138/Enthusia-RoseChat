@@ -10,11 +10,11 @@ final class AiModerationTestConfig {
 
     static AiModerationConfig create() {
         Map<String, Double> thresholds = new LinkedHashMap<>();
-        thresholds.put("harassment", 0.92);
+        thresholds.put("harassment", 0.97);
         thresholds.put("harassment/threatening", 0.78);
         thresholds.put("hate", 0.82);
         thresholds.put("hate/threatening", 0.70);
-        thresholds.put("self-harm/instructions", 0.80);
+        thresholds.put("self-harm/instructions", 0.75);
         thresholds.put("sexual/minors", 0.65);
         thresholds.put("violence/graphic", 0.92);
         thresholds.put("illicit/violent", 0.92);
@@ -39,7 +39,7 @@ final class AiModerationTestConfig {
                 0.75,
                 thresholds,
                 0.55,
-                "rosechat.seeblocked"
+                "rosechat.ai.alerts"
         );
     }
 }

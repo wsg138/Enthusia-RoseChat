@@ -47,6 +47,18 @@ public final class AiModerationManager implements AutoCloseable, Listener {
     private static final int SAFE_GLOBAL_REQUESTS_PER_MINUTE = 450;
     private static final int SAFE_PLAYER_REQUESTS_PER_TEN_SECONDS = 8;
     private static final int MAX_IN_FLIGHT_REQUESTS = 64;
+    private static final int STAFF_ALERT_MESSAGE_LIMIT = 180;
+
+    private static final String COLOR_DARK_GRAY = "\u00A78";
+    private static final String COLOR_GRAY = "\u00A77";
+    private static final String COLOR_AQUA = "\u00A7b";
+    private static final String COLOR_DARK_AQUA = "\u00A73";
+    private static final String COLOR_GREEN = "\u00A7a";
+    private static final String COLOR_YELLOW = "\u00A7e";
+    private static final String COLOR_GOLD = "\u00A76";
+    private static final String COLOR_RED = "\u00A7c";
+    private static final String COLOR_BOLD = "\u00A7l";
+    private static final String COLOR_RESET = "\u00A7r";
 
     private final RoseChat plugin;
     private final Clock clock;
@@ -276,8 +288,7 @@ public final class AiModerationManager implements AutoCloseable, Listener {
             publishIfPending(pending);
             if (verdict.action() != AiModerationPolicy.Action.ALLOW) {
                 metrics.shadowFlagged();
-                alertStaff("[AI shadow] " + pending.senderName + " would be " + verdict.action()
-                        + " for " + verdict.category() + " (severity " + verdict.severity() + ").");
+                alertDecision(pending, verdict, "SHADOW " + verdict.action().name(), COLOR_AQUA, followUp);
             }
             auditVerdict(pending, verdict, (followUp ? "FOLLOWUP_SHADOW_" : "SHADOW_") + verdict.action(), latencyMs);
         } else if (verdict.action() == AiModerationPolicy.Action.DELETE) {
@@ -286,8 +297,7 @@ public final class AiModerationManager implements AutoCloseable, Listener {
             publishIfPending(pending);
             if (verdict.action() == AiModerationPolicy.Action.ALERT_ONLY) {
                 metrics.alerted();
-                alertStaff("AI moderation flagged " + pending.senderName + " for staff review: "
-                        + verdict.category() + " (severity " + verdict.severity() + ").");
+                alertDecision(pending, verdict, "REVIEW", COLOR_GOLD, followUp);
                 notifyPlayer(pending.senderId, "Your message was flagged for staff review by chat moderation.");
             } else {
                 metrics.allowed();
@@ -404,8 +414,7 @@ public final class AiModerationManager implements AutoCloseable, Listener {
         }
         auditVerdict(pending, verdict,
                 (followUp ? "FOLLOWUP_" : "") + (late ? "DELETE_LATE" : "DELETE_PRE_BROADCAST"), latencyMs);
-        alertStaff("AI moderation " + (late ? "removed" : "blocked") + " a public message from "
-                + pending.senderName + ": " + verdict.category() + " (severity " + verdict.severity() + ").");
+        alertDecision(pending, verdict, late ? "REMOVED" : "BLOCKED", COLOR_RED, followUp);
         if (current.punishmentsEnabled()) {
             recordStrike(pending, verdict, current, activeStrikeStore);
         }
@@ -495,7 +504,7 @@ public final class AiModerationManager implements AutoCloseable, Listener {
             notifyPlayer(pending.senderId, "You have been publicly muted for " + current.muteDuration().toDays()
                     + " days after " + count + " AI moderation enforcement strikes within "
                     + current.strikeWindow().toMinutes() + " minutes.");
-            alertStaff("EnthusiaStaff applied the AI moderation public mute for " + pending.senderName + ".");
+            alertStaffSystem("MUTED", COLOR_RED, "EnthusiaStaff applied the AI public mute to " + pending.senderName + '.');
         } else {
             String detail = moderationResult == null ? "no result" : moderationResult.status() + ": " + moderationResult.detail();
             alertStaff("AI moderation reached the public-mute threshold for " + pending.senderName
@@ -516,7 +525,8 @@ public final class AiModerationManager implements AutoCloseable, Listener {
             if (attempt < 8) {
                 scheduler.schedule(() -> resolvePublishedMessageId(pending, attempt + 1), 50, TimeUnit.MILLISECONDS);
             } else if (pending.deleteRequested.get()) {
-                alertStaff("AI moderation flagged a message after broadcast, but RoseChat could not uniquely identify its message UUID for late deletion.");
+                alertStaffSystem("DELETE FAILED", COLOR_RED,
+                        "RoseChat could not uniquely identify the message UUID for late deletion.");
             }
         });
     }
@@ -627,7 +637,7 @@ public final class AiModerationManager implements AutoCloseable, Listener {
         consecutiveFailures.set(0);
         Health prior = health.getAndSet(new Health(Status.HEALTHY, "OpenAI moderation responding"));
         if (prior.status() == Status.DOWN) {
-            alertStaff("AI chat moderation recovered; normal moderation requests have resumed.");
+            alertStaffSystem("RECOVERED", COLOR_GREEN, "OpenAI moderation is responding again.");
         }
     }
 
@@ -639,7 +649,7 @@ public final class AiModerationManager implements AutoCloseable, Listener {
             Health prior = health.getAndSet(new Health(Status.DOWN,
                     reason + "; circuit open until " + circuitOpenUntil));
             if (prior.status() != Status.DOWN) {
-                alertStaff("AI chat moderation is DOWN and chat is fail-open. Reason: " + reason + '.');
+                alertStaffSystem("OFFLINE", COLOR_RED, "Fail-open active. Reason: " + reason + '.');
             }
         } else {
             health.set(new Health(Status.DEGRADED, reason));
@@ -694,10 +704,72 @@ public final class AiModerationManager implements AutoCloseable, Listener {
         });
     }
 
+    private void alertDecision(
+            PendingMessage pending,
+            AiModerationPolicy.Verdict verdict,
+            String action,
+            String actionColor,
+            boolean followUp
+    ) {
+        String header = staffAlertPrefix()
+                + actionColor + COLOR_BOLD + action + COLOR_RESET
+                + COLOR_DARK_GRAY + " • " + COLOR_YELLOW + pending.senderName
+                + COLOR_DARK_GRAY + " • " + COLOR_AQUA + verdict.category()
+                + COLOR_DARK_GRAY + " • " + severityColor(verdict.severity())
+                + verdict.severity() + "/100"
+                + (followUp ? COLOR_DARK_GRAY + " • " + COLOR_DARK_AQUA + "follow-up" : "");
+        String detail = COLOR_DARK_GRAY + "  ↳ " + COLOR_GRAY + '"'
+                + compactStaffMessage(pending.options.message()) + '"';
+        alertStaffRaw(header + '\n' + detail);
+    }
+
     private void alertStaff(String message) {
+        alertStaffSystem("NOTICE", COLOR_GOLD, message);
+    }
+
+    private void alertStaffSystem(String label, String labelColor, String detail) {
+        alertStaffRaw(staffAlertPrefix()
+                + labelColor + COLOR_BOLD + label + COLOR_RESET
+                + COLOR_DARK_GRAY + " • " + COLOR_GRAY + detail);
+    }
+
+    private void alertStaffRaw(String formattedMessage) {
         Bukkit.getScheduler().runTask(plugin, () -> Bukkit.getOnlinePlayers().stream()
                 .filter(player -> player.hasPermission(config.staffStatusPermission()))
-                .forEach(player -> player.sendMessage(message)));
+                .forEach(player -> player.sendMessage(formattedMessage)));
+    }
+
+    private static String staffAlertPrefix() {
+        return COLOR_DARK_GRAY + '[' + COLOR_AQUA + COLOR_BOLD + "AI MOD"
+                + COLOR_RESET + COLOR_DARK_GRAY + "] ";
+    }
+
+    private static String severityColor(int severity) {
+        if (severity >= 90) {
+            return COLOR_RED;
+        }
+        if (severity >= 70) {
+            return COLOR_GOLD;
+        }
+        if (severity >= 40) {
+            return COLOR_YELLOW;
+        }
+        return COLOR_GREEN;
+    }
+
+    private static String compactStaffMessage(String message) {
+        if (message == null || message.isBlank()) {
+            return "<empty>";
+        }
+        String compact = message
+                .replace('\n', ' ')
+                .replace('\r', ' ')
+                .replace("\u00A7", "")
+                .trim();
+        if (compact.length() <= STAFF_ALERT_MESSAGE_LIMIT) {
+            return compact;
+        }
+        return compact.substring(0, STAFF_ALERT_MESSAGE_LIMIT - 3) + "...";
     }
 
     @EventHandler
@@ -708,8 +780,10 @@ public final class AiModerationManager implements AutoCloseable, Listener {
                 || !event.getPlayer().hasPermission(current.staffStatusPermission())) {
             return;
         }
-        event.getPlayer().sendMessage("AI CHAT MODERATION " + currentHealth.status()
-                + " - chat is fail-open. " + currentHealth.detail());
+        event.getPlayer().sendMessage(staffAlertPrefix()
+                + COLOR_RED + COLOR_BOLD + "FAIL-OPEN" + COLOR_RESET
+                + COLOR_DARK_GRAY + " • " + COLOR_GRAY + currentHealth.status()
+                + ": " + currentHealth.detail());
     }
 
     public Health health() {
