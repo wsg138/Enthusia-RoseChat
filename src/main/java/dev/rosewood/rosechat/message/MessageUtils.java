@@ -11,6 +11,7 @@ import dev.rosewood.rosechat.message.contents.MessageContents;
 import dev.rosewood.rosechat.message.tokenizer.MessageTokenizer;
 import dev.rosewood.rosechat.message.tokenizer.Tokenizers;
 import dev.rosewood.rosechat.message.tokenizer.composer.ChatComposer;
+import dev.rosewood.rosechat.moderation.ai.AiModerationManager;
 import dev.rosewood.rosechat.message.tokenizer.placeholder.RoseChatPlaceholderTokenizer;
 import dev.rosewood.rosechat.message.tokenizer.shader.ShaderTokenizer;
 import dev.rosewood.rosechat.placeholder.DefaultPlaceholders;
@@ -173,6 +174,17 @@ public class MessageUtils {
      * @param callback The delivery result callback.
      */
     public static void sendPrivateMessage(RosePlayer sender, String targetName, String message, UUID messageId, Consumer<Boolean> callback) {
+        sendPrivateMessage(sender, targetName, message, messageId, callback, false);
+    }
+
+    private static void sendPrivateMessage(
+            RosePlayer sender,
+            String targetName,
+            String message,
+            UUID messageId,
+            Consumer<Boolean> callback,
+            boolean centralApproved
+    ) {
         RoseChatAPI api = RoseChatAPI.getInstance();
         String consoleName = api.getLocaleManager().getMessage("console-sender-name");
         boolean isConsoleName = targetName.equalsIgnoreCase("Console") ||
@@ -217,44 +229,77 @@ public class MessageUtils {
             roseMessage.setUUID(messageId);
 
         RoseChatStaffServiceImpl staffService = RoseChat.getInstance().getStaffService();
-        if (staffService != null
-                && !staffService.allowPrivatePreflight(roseMessage, messageTarget, message)) {
-            completePrivateMessage(callback, false);
-            return;
-        }
+        String deliveredMessage;
+        if (centralApproved) {
+            roseMessage.setPlayerInput(message);
+            deliveredMessage = message;
 
-        MessageRules rules = new MessageRules().applyAllFilters();
-        RuleOutputs outputs = rules.apply(roseMessage, message);
-        roseMessage.setPlayerInput(outputs.getFilteredMessage());
-
-        // If the message is blocked, send a warning to the player.
-        if (outputs.isBlocked()) {
-            if (outputs.getWarningMessage() != null) {
-                sender.send(outputs.getWarningMessage());
-            } else if (outputs.getWarning() != null) {
-                outputs.getWarning().send(sender);
+            // Revalidate mutable local authority after the bounded AI hold before delivery.
+            if (staffService != null
+                    && (!staffService.allowPrivatePreflight(roseMessage, messageTarget, deliveredMessage)
+                    || !staffService.allowPrivateMessage(roseMessage, messageTarget, deliveredMessage))) {
+                completePrivateMessage(callback, false);
+                return;
+            }
+        } else {
+            if (staffService != null
+                    && !staffService.allowPrivatePreflight(roseMessage, messageTarget, message)) {
+                completePrivateMessage(callback, false);
+                return;
             }
 
-            if (Settings.SEND_BLOCKED_MESSAGES_TO_STAFF.get() && outputs.shouldNotifyStaff()) {
-                for (Player staffPlayer : Bukkit.getOnlinePlayers()) {
-                    if (staffPlayer.hasPermission("rosechat.seeblocked")) {
-                        RosePlayer rosePlayer = new RosePlayer(staffPlayer);
-                        rosePlayer.sendLocaleMessage("blocked-message",
-                                StringPlaceholders.of("player", roseMessage.getSender().getName(),
-                                        "message", message));
+            MessageRules rules = new MessageRules().applyAllFilters();
+            RuleOutputs outputs = rules.apply(roseMessage, message);
+            roseMessage.setPlayerInput(outputs.getFilteredMessage());
+
+            // If the message is blocked, send a warning to the player.
+            if (outputs.isBlocked()) {
+                if (outputs.getWarningMessage() != null) {
+                    sender.send(outputs.getWarningMessage());
+                } else if (outputs.getWarning() != null) {
+                    outputs.getWarning().send(sender);
+                }
+
+                if (Settings.SEND_BLOCKED_MESSAGES_TO_STAFF.get() && outputs.shouldNotifyStaff()) {
+                    for (Player staffPlayer : Bukkit.getOnlinePlayers()) {
+                        if (staffPlayer.hasPermission("rosechat.seeblocked")) {
+                            RosePlayer rosePlayer = new RosePlayer(staffPlayer);
+                            rosePlayer.sendLocaleMessage("blocked-message",
+                                    StringPlaceholders.of("player", roseMessage.getSender().getName(),
+                                            "message", message));
+                        }
                     }
                 }
+
+                completePrivateMessage(callback, false);
+                return;
             }
 
-            completePrivateMessage(callback, false);
-            return;
-        }
+            deliveredMessage = roseMessage.getPlayerInput();
+            if (staffService != null
+                    && !staffService.allowPrivateMessage(roseMessage, messageTarget, deliveredMessage)) {
+                completePrivateMessage(callback, false);
+                return;
+            }
 
-        String deliveredMessage = roseMessage.getPlayerInput();
-        if (staffService != null
-                && !staffService.allowPrivateMessage(roseMessage, messageTarget, deliveredMessage)) {
-            completePrivateMessage(callback, false);
-            return;
+            AiModerationManager aiModeration = RoseChat.getInstance().getAiModerationManager();
+            if (aiModeration != null && aiModeration.moderatePrivateAndSend(
+                    roseMessage.getUUID(),
+                    sender,
+                    messageTarget,
+                    deliveredMessage,
+                    () -> sendPrivateMessage(
+                            sender,
+                            targetName,
+                            deliveredMessage,
+                            roseMessage.getUUID(),
+                            callback,
+                            true
+                    ),
+                    () -> completePrivateMessage(callback, false)
+            )) {
+                return;
+            }
         }
 
         // Parse the message for the console
