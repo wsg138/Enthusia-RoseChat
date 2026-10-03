@@ -486,7 +486,7 @@ class CentralModerationEngineTest {
         engine.submit(pending());
         engine.submit(pending());
         await(() -> transport.requests.size() == 2, "two failing requests");
-        assertTrue(engine.health().circuitOpen(), "circuit must open after failuresToOpen failures");
+        await(() -> engine.health().circuitOpen(), "circuit opens after failure callbacks complete");
         assertTrue(actions.staffAlerts.stream().anyMatch(a -> a.contains("OFFLINE")));
 
         int publishedBefore = actions.published.size();
