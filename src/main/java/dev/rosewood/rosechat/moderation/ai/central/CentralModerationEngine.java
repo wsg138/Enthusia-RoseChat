@@ -170,6 +170,7 @@ public final class CentralModerationEngine {
         public final UUID senderId;
         public final String senderName;
         public final String text;
+        public final boolean lateDeletionSupported;
 
         private final AtomicReference<MessageState> state = new AtomicReference<>(MessageState.PENDING);
         private final AtomicBoolean enforced = new AtomicBoolean();
@@ -187,6 +188,22 @@ public final class CentralModerationEngine {
                 String senderName,
                 String text
         ) {
+            this(eventId, profile, scopeId, channelId, conversationId, recipientIds,
+                    senderId, senderName, text, true);
+        }
+
+        public PendingMessage(
+                UUID eventId,
+                ChannelProfile profile,
+                String scopeId,
+                String channelId,
+                String conversationId,
+                List<UUID> recipientIds,
+                UUID senderId,
+                String senderName,
+                String text,
+                boolean lateDeletionSupported
+        ) {
             this.eventId = Objects.requireNonNull(eventId, "eventId");
             this.externalMessageId = CentralModerationIds.externalMessageId(eventId);
             this.canonicalMessageId = CentralModerationIds.canonicalMessageId(eventId);
@@ -198,6 +215,7 @@ public final class CentralModerationEngine {
             this.senderId = Objects.requireNonNull(senderId, "senderId");
             this.senderName = senderName == null ? "" : senderName;
             this.text = text == null ? "" : text;
+            this.lateDeletionSupported = lateDeletionSupported;
         }
 
         CentralModerationRequest toRequest(Instant occurredAt) {
@@ -541,19 +559,23 @@ public final class CentralModerationEngine {
         MessageState previous = pending.state.getAndUpdate(state ->
                 state == MessageState.PENDING ? MessageState.BLOCKED : state);
         boolean late = previous == MessageState.PUBLISHED;
-        metrics.deleted(late);
+        String surface = pending.profile == ChannelProfile.MINECRAFT_PRIVATE
+                ? "private message"
+                : "public message";
         if (previous == MessageState.PENDING) {
+            metrics.deleted(false);
             ScheduledFuture<?> timer = pending.holdTimer;
             if (timer != null) {
                 timer.cancel(false);
             }
             pendingByExternalId.remove(pending.externalMessageId);
             actions.notifyBlocked(pending.senderId,
-                    "Your public message was blocked by AI moderation (" + decision.semanticLabel() + ").");
+                    "Your " + surface + " was blocked by AI moderation (" + decision.semanticLabel() + ").");
             audit(pending, "CENTRAL_BLOCK_PRE_BROADCAST", decision.semanticLabel(),
                     decision.confidence(), decision.reasonCodes(), latencyMs);
             actions.alertStaff("BLOCKED " + pending.senderName + " [" + decision.semanticLabel() + "]");
-        } else if (late) {
+        } else if (late && pending.lateDeletionSupported) {
+            metrics.deleted(true);
             long blockGen = generation.get();
             pending.deleteRequested.set(true);
             actions.notifyRemoved(pending.senderId,
@@ -562,6 +584,12 @@ public final class CentralModerationEngine {
                     decision.confidence(), decision.reasonCodes(), latencyMs);
             actions.alertStaff("REMOVED " + pending.senderName + " [" + decision.semanticLabel() + "]");
             tryDeleteExact(pending, blockGen, 0);
+        } else if (late) {
+            pendingByExternalId.remove(pending.externalMessageId);
+            audit(pending, "CENTRAL_BLOCK_LATE_UNRETRACTABLE", decision.semanticLabel(),
+                    decision.confidence(), decision.reasonCodes(), latencyMs);
+            actions.alertStaff("LATE BLOCK " + pending.senderName + " [" + decision.semanticLabel()
+                    + "] private message was already delivered; exact retraction is unsupported.");
         } else {
             audit(pending, "CENTRAL_BLOCK_RACE_NOOP", decision.semanticLabel(),
                     decision.confidence(), decision.reasonCodes(), latencyMs);
