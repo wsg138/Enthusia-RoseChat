@@ -5,6 +5,10 @@ public interface BridgeRegistration extends AutoCloseable {
 
     boolean isActive();
 
+    default boolean renderPresence(PresenceContext context) {
+        return false;
+    }
+
     @Override
     void close();
 }

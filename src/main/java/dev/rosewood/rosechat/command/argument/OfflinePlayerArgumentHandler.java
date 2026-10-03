@@ -2,16 +2,16 @@ package dev.rosewood.rosechat.command.argument;
 
 import dev.rosewood.rosechat.api.RoseChatAPI;
 import dev.rosewood.rosechat.message.MessageUtils;
+import dev.rosewood.rosechat.staff.StaffVisibilityPolicy;
 import dev.rosewood.rosegarden.command.framework.Argument;
 import dev.rosewood.rosegarden.command.framework.ArgumentHandler;
 import dev.rosewood.rosegarden.command.framework.CommandContext;
 import dev.rosewood.rosegarden.command.framework.InputIterator;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.function.Predicate;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 
 public class OfflinePlayerArgumentHandler extends ArgumentHandler<String> {
@@ -20,7 +20,6 @@ public class OfflinePlayerArgumentHandler extends ArgumentHandler<String> {
 
     public OfflinePlayerArgumentHandler(boolean withBungeePlayers) {
         super(String.class);
-
         this.withBungeePlayers = withBungeePlayers;
     }
 
@@ -33,34 +32,46 @@ public class OfflinePlayerArgumentHandler extends ArgumentHandler<String> {
                 return player.getName();
         }
 
-        if (input.trim().isEmpty()) {
+        if (input.trim().isEmpty())
             throw new ArgumentHandler.HandledArgumentException("argument-handler-string");
-        } else {
-            return input;
-        }
+        return input;
     }
 
     @Override
     public List<String> suggest(CommandContext context, Argument argument, String[] args) {
         List<String> suggestions = new ArrayList<>(Bukkit.getOnlinePlayers().stream()
-                .filter(Predicate.not(MessageUtils::isPlayerVanished))
-                .map(p -> p.getDisplayName().contains(" ") ? p.getName() : ChatColor.stripColor(p.getDisplayName()))
+                .filter(player -> StaffVisibilityPolicy.canSee(context.getSender(), player))
+                .map(OfflinePlayerArgumentHandler::suggestionName)
                 .toList());
 
-        if (this.withBungeePlayers && RoseChatAPI.getInstance().isBungee()) {
-            RoseChatAPI api = RoseChatAPI.getInstance();
-            if (api.getBungeeManager().getBungeePlayers().containsKey("ALL")) {
-                Collection<String> players = api.getBungeeManager().getBungeePlayers().get("ALL");
-                for (String player : players) {
-                    if (context.getSender().getName().equalsIgnoreCase(player))
-                        continue;
-
-                    suggestions.add(player);
-                }
-            }
+        if (this.withBungeePlayers
+                && !StaffVisibilityPolicy.isCanonicalVisibilityRequired()
+                && RoseChatAPI.getInstance().isBungee()) {
+            addRemoteSuggestions(context, suggestions);
         }
 
-        return suggestions;
+        String prefix = args.length == 0 ? "" : args[args.length - 1];
+        return suggestions.stream()
+                .filter(suggestion -> matchesPrefix(suggestion, prefix))
+                .distinct()
+                .toList();
     }
 
+    private static String suggestionName(Player player) {
+        String displayName = player.getDisplayName();
+        return displayName.contains(" ") ? player.getName() : ChatColor.stripColor(displayName);
+    }
+
+    private static void addRemoteSuggestions(CommandContext context, List<String> suggestions) {
+        RoseChatAPI api = RoseChatAPI.getInstance();
+        Collection<String> players = api.getBungeeManager().getBungeePlayers().get("ALL");
+        for (String player : players) {
+            if (!context.getSender().getName().equalsIgnoreCase(player))
+                suggestions.add(player);
+        }
+    }
+
+    static boolean matchesPrefix(String suggestion, String prefix) {
+        return prefix.isEmpty() || suggestion.regionMatches(true, 0, prefix, 0, prefix.length());
+    }
 }

@@ -13,6 +13,7 @@ class FullFeatureCoverageContractTest {
             "dev.rosewood.rosechat.api.staff.StaffContextContractTest",
             "dev.rosewood.rosechat.chat.FilterWarningTest",
             "dev.rosewood.rosechat.chat.channel.ChannelConcurrencyTest",
+            "dev.rosewood.rosechat.manager.EnthusiaStaffCommandCompatibilityTest",
             "dev.rosewood.rosechat.placeholder.condition.OperatorTest",
             "dev.rosewood.rosechat.staff.StaffBridgeCoordinatorTest"
     );

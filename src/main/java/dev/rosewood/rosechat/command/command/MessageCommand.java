@@ -6,6 +6,7 @@ import dev.rosewood.rosechat.command.argument.OfflinePlayerArgumentHandler;
 import dev.rosewood.rosechat.config.Settings;
 import dev.rosewood.rosechat.message.MessageUtils;
 import dev.rosewood.rosechat.message.RosePlayer;
+import dev.rosewood.rosechat.staff.StaffVisibilityPolicy;
 import dev.rosewood.rosegarden.RosePlugin;
 import dev.rosewood.rosegarden.command.argument.ArgumentHandlers;
 import dev.rosewood.rosegarden.command.framework.ArgumentsDefinition;
@@ -51,6 +52,11 @@ public class MessageCommand extends RoseChatCommand {
     public void execute(CommandContext context, String targetName, String message) {
         RosePlayer player = new RosePlayer(context.getSender());
         Player target = MessageUtils.getPlayerExact(targetName);
+        if (target != null && !StaffVisibilityPolicy.canSee(context.getSender(), target)) {
+            this.sendUnavailablePlayer(player);
+            return;
+        }
+
         RosePlayer messagePlayer = target == null
                 ? new RosePlayer(targetName, "default")
                 : new RosePlayer(target);
@@ -66,9 +72,7 @@ public class MessageCommand extends RoseChatCommand {
                 && target == null
                 && this.getAPI().isBungee()
                 && this.getAPI().getBungeeManager().getAllPlayers().contains(messagePlayer.getRealName())) {
-            player.sendLocaleMessage("invalid-argument",
-                    StringPlaceholders.of("message",
-                            this.getAPI().getLocaleManager().getLocaleMessage("argument-handler-player")));
+            this.sendUnavailablePlayer(player);
             return;
         }
 
@@ -103,4 +107,9 @@ public class MessageCommand extends RoseChatCommand {
         });
     }
 
+    private void sendUnavailablePlayer(RosePlayer player) {
+        player.sendLocaleMessage("invalid-argument",
+                StringPlaceholders.of("message",
+                        this.getAPI().getLocaleManager().getLocaleMessage("argument-handler-player")));
+    }
 }

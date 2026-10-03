@@ -56,6 +56,49 @@ class StaffBridgeCoordinatorTest {
     }
 
     @Test
+    void activeRegistrationCanRenderPresenceButStaleRegistrationCannot() {
+        AtomicInteger renders = new AtomicInteger();
+        StaffBridgeCoordinator coordinator = new StaffBridgeCoordinator(
+                Logger.getLogger(StaffBridgeCoordinatorTest.class.getName()),
+                context -> {
+                    renders.incrementAndGet();
+                    return true;
+                }
+        );
+        PresenceContext context = new PresenceContext(SENDER_ID, RECIPIENT_ID, PresenceType.QUIT);
+        BridgeRegistration first = coordinator.install("first", configuration(), new RoseChatModerationBridge() { });
+
+        assertTrue(first.renderPresence(context));
+        assertEquals(1, renders.get());
+
+        first.close();
+        BridgeRegistration second = coordinator.install("second", configuration(), new RoseChatModerationBridge() { });
+
+        assertFalse(first.renderPresence(context));
+        assertTrue(second.renderPresence(context));
+        assertEquals(2, renders.get());
+    }
+
+    @Test
+    void presenceRendererFailureIsContained() {
+        StaffBridgeCoordinator coordinator = new StaffBridgeCoordinator(
+                Logger.getLogger(StaffBridgeCoordinatorTest.class.getName()),
+                context -> {
+                    throw new IllegalStateException("renderer unavailable");
+                }
+        );
+        BridgeRegistration registration = coordinator.install(
+                "owner",
+                configuration(),
+                new RoseChatModerationBridge() { }
+        );
+
+        assertFalse(registration.renderPresence(
+                new PresenceContext(SENDER_ID, RECIPIENT_ID, PresenceType.JOIN)
+        ));
+    }
+
+    @Test
     void muteDecisionCanBeEvaluatedBeforeBroadcastCallback() {
         StaffBridgeCoordinator coordinator = coordinator();
         boolean[] broadcastCalled = {false};
