@@ -106,8 +106,12 @@ class OutboundChatBridgeCoordinatorTest {
     void rejectsExpiredAndOversizePayloads() {
         OutboundChatBridgeCoordinator coordinator = coordinator();
         coordinator.install(message -> { });
+        UUID expiredId = UUID.randomUUID();
         OutboundChatMessage expired = new OutboundChatMessage(
-                UUID.randomUUID(), NOW - 2_000, NOW - 1_000, "global", ChannelClassification.PUBLIC,
+                expiredId,
+                "rosechat-mc-" + expiredId,
+                "rosechat-canonical-" + expiredId,
+                NOW - 2_000, NOW - 1_000, "global", ChannelClassification.PUBLIC,
                 OutboundChatMessage.Origin.MINECRAFT, UUID.randomUUID(), "Player", "old");
 
         assertEquals(OutboundChatBridgeCoordinator.DispatchResult.EXPIRED, coordinator.publish(expired));
@@ -228,6 +232,8 @@ class OutboundChatBridgeCoordinatorTest {
     ) {
         return new OutboundChatMessage(
                 eventId,
+                "rosechat-mc-" + eventId,
+                "rosechat-canonical-" + eventId,
                 NOW,
                 NOW + 5_000,
                 "global",
