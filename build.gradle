@@ -6,7 +6,7 @@ buildscript {
         gradlePluginPortal()
     }
     dependencies {
-        classpath 'com.gradleup.shadow:shadow-gradle-plugin:8.3.5'
+        classpath 'com.gradleup.shadow:shadow-gradle-plugin:9.6.1'
     }
 }
 
@@ -18,10 +18,10 @@ plugins {
 apply plugin: 'com.gradleup.shadow'
 
 group = 'dev.rosewood'
-version = 'RC-4'
+version = 'RC-4-presence-26.2-test.4'
 
 java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+    toolchain.languageVersion.set(JavaLanguageVersion.of(25))
     disableAutoTargetJvm()
 }
 
@@ -64,7 +64,7 @@ dependencies {
     compileOnly 'net.kyori:adventure-api:4.25.0'
     compileOnly 'net.md-5:bungeecord-chat:1.21-R0.5-20251216.193400-13'
     compileOnly 'net.md-5:bungeecord-api:1.21-R0.5-20251216.193400-13'
-    compileOnly 'io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT', {
+    compileOnly 'io.papermc.paper:paper-api:26.2.build.129-stable', {
         exclude group: 'net.md-5'
     }
     compileOnly 'me.clip:placeholderapi:2.11.6'
@@ -97,10 +97,11 @@ dependencies {
 
     testImplementation platform('org.junit:junit-bom:5.12.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
-    testRuntimeOnly 'io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT', {
+    testImplementation 'io.papermc.paper:paper-api:26.2.build.129-stable', {
         exclude group: 'net.md-5'
     }
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testRuntimeOnly 'net.md-5:bungeecord-chat:1.21-R0.5-20251216.193400-13'
 }
 
 tasks.withType(Test).configureEach {
@@ -126,7 +127,7 @@ shadowJar {
 publishing {
     publications {
         shadow(MavenPublication) { publication ->
-            project.shadow.component(publication)
+            from components.shadow
             artifactId = rootProject.name.toLowerCase()
             pom {
                 name = rootProject.name.toLowerCase()
