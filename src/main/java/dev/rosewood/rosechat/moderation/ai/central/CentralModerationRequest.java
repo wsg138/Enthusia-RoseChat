@@ -132,10 +132,9 @@ public record CentralModerationRequest(
     }
 
     /**
-     * Builds the canonical request for a private message. The private-message
-     * surface is currently bypassed locally (unchanged from the legacy path);
-     * this constructor exists so the mapping is exercised and tested for any
-     * future private-message coverage.
+     * Builds the canonical request for an integrated private-message surface.
+     * Recipient UUIDs and conversation scope must come from authoritative
+     * RoseChat state; display names are never promoted into identity metadata.
      */
     public static CentralModerationRequest privateMessage(
             String scopeId,
