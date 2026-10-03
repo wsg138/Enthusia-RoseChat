@@ -165,6 +165,23 @@ class CentralModerationEngineTest {
         );
     }
 
+    private PendingMessage privatePending(boolean lateDeletionSupported) {
+        UUID senderId = UUID.randomUUID();
+        UUID recipientId = UUID.randomUUID();
+        return new PendingMessage(
+                UUID.randomUUID(),
+                ChannelProfile.MINECRAFT_PRIVATE,
+                "smp",
+                "private",
+                "minecraft-private:" + senderId + ':' + recipientId,
+                List.of(recipientId),
+                senderId,
+                "Steve",
+                "private hello",
+                lateDeletionSupported
+        );
+    }
+
     static CentralModerationDecision allowDecision(String label) {
         return new CentralModerationDecision(
                 CentralModerationDecision.MessageAction.ALLOW, "INGESTED", false, label,
@@ -230,6 +247,58 @@ class CentralModerationEngineTest {
         assertEquals(1, metrics.snapshot().centralBlocked());
         assertTrue(actions.blockedNotices.get(0).contains("SEVERE_HARASSMENT"));
         assertTrue(actions.audits.stream().anyMatch(a -> "CENTRAL_BLOCK_PRE_BROADCAST".equals(a.outcome())));
+    }
+
+    @Test
+    void privateMessageUsesPrivateProfileAndAuthoritativeRecipient() {
+        PendingMessage message = privatePending(false);
+        engine.submit(message);
+
+        await(() -> actions.published.size() == 1, "private publication");
+        await(() -> transport.requests.size() == 1, "private central request");
+
+        CentralModerationRequest request = transport.requests.get(0);
+        assertEquals(ChannelProfile.MINECRAFT_PRIVATE, request.profile());
+        assertEquals("private", request.channelId());
+        assertEquals(message.conversationId, request.conversationId());
+        assertEquals(message.recipientIds, request.recipientIds());
+        assertEquals(message.externalMessageId, request.externalMessageId());
+        assertEquals(message.canonicalMessageId, request.canonicalMessageId());
+    }
+
+    @Test
+    void privateBlockBeforePublishUsesPrivateSurfaceAndNeverPublishes() {
+        transport.behavior = request -> CompletableFuture.completedFuture(
+                blockDecision("SEVERE_HARASSMENT", List.of()));
+        PendingMessage message = privatePending(false);
+        engine.submit(message);
+
+        await(() -> actions.blockedNotices.size() == 1, "private block notice");
+
+        assertTrue(actions.published.isEmpty());
+        assertTrue(actions.blockedNotices.get(0).contains("private message"));
+        assertTrue(actions.audits.stream().anyMatch(
+                audit -> "CENTRAL_BLOCK_PRE_BROADCAST".equals(audit.outcome())));
+    }
+
+    @Test
+    void latePrivateBlockDoesNotClaimOrGuessRetraction() {
+        CompletableFuture<CentralModerationDecision> future = new CompletableFuture<>();
+        transport.behavior = request -> future;
+        PendingMessage message = privatePending(false);
+        engine.submit(message);
+
+        await(() -> actions.published.size() == 1, "private fail-open publication");
+        future.complete(blockDecision("SEVERE_HARASSMENT", List.of()));
+
+        await(() -> actions.audits.stream().anyMatch(
+                audit -> "CENTRAL_BLOCK_LATE_UNRETRACTABLE".equals(audit.outcome())),
+                "late private block audit");
+
+        assertTrue(actions.deleted.isEmpty(), "private late block must not guess a deletion target");
+        assertTrue(actions.removedNotices.isEmpty(),
+                "sender must not be told an already-delivered private message was removed");
+        assertTrue(actions.staffAlerts.stream().anyMatch(alert -> alert.contains("LATE BLOCK")));
     }
 
     // ---- Required test 3: timeout -> publish/fail open ----
