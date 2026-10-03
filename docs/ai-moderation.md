@@ -24,7 +24,7 @@ punishment/case authority.
 | RoseChat surface | `ChannelClassification` | Central profile |
 |---|---|---|
 | Public channels | `PUBLIC` | `minecraft_public` |
-| Private messages | `PRIVATE` | `minecraft_private` (mapped; currently bypassed locally, unchanged from the legacy path) |
+| Private messages | `PRIVATE` | `minecraft_private` (same bounded central engine; authoritative UUID recipient metadata when available) |
 | Staff channels | `STAFF` | exempt — bypassed locally, text never submitted |
 
 Staff-only/configured-exempt text is never sent to the central service, not even for logging.
@@ -47,6 +47,8 @@ For a player-originated public message:
 5. A later `BLOCK` deletes the already-published message only when the exact message UUID resolves through the ID registry, then notifies the sender. If the UUID cannot be resolved, RoseChat refuses to guess and alerts staff instead.
 
 An atomic message lifecycle prevents a response racing the timeout from publishing or enforcing twice.
+
+Private messages use the same bounded central engine after RoseChat's local PM checks and message rules. An early `BLOCK` suppresses delivery. If the hold expires, the PM fails open and is delivered after mutable local permission/mute state is revalidated. RoseChat has no authoritative post-send PM retraction primitive, so a later `BLOCK` is audited and surfaced to staff instead of guessing a deletion or telling the sender the message was removed.
 
 ## Failure behavior
 
