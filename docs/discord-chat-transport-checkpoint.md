@@ -46,7 +46,9 @@ No `wsg138` InteractiveChat / InteractiveChat-DiscordSRV-Addon fork was found du
 
 `OutboundChatMessage` is intentionally free of DiscordSRV/JDA classes. It carries:
 
-- stable event ID for duplicate suppression;
+- stable RoseChat event ID for duplicate suppression;
+- stable central `external_message_id` for the Minecraft copy;
+- stable central `canonical_message_id` that W14 must preserve on the Discord mirror;
 - creation time and hard expiry for ephemeral delivery;
 - logical RoseChat channel ID for explicit routing;
 - privacy classification;
@@ -54,7 +56,7 @@ No `wsg138` InteractiveChat / InteractiveChat-DiscordSRV-Addon fork was found du
 - Minecraft UUID when present plus a safe presentation name;
 - canonical bounded plain text, which remains the fallback if rich rendering fails.
 
-The later Staff transport envelope should add the authenticated backend/server identity and explicit Minecraft-server <-> Discord-channel routing. Reply references, normalized mention intents and bounded rendered attachments belong in the rendered/transport stage rather than in RoseChat's policy event.
+The later Staff transport envelope should preserve `externalMessageId` and `canonicalMessageId` unchanged while adding the authenticated backend/server identity and explicit Minecraft-server <-> Discord-channel routing. W14 must use its own Discord snowflake as the Discord-side external ID while reusing this canonical ID; it must never reconstruct mirror identity by message text. Reply references, normalized mention intents and bounded rendered attachments belong in the rendered/transport stage rather than in RoseChat's policy event.
 
 ## Delivery semantics
 
