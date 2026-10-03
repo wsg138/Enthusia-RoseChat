@@ -218,8 +218,68 @@ public final class AiModerationManager implements AutoCloseable, Listener {
             channel.send(options);
             return;
         }
-        deliveryTargets.put(eventId, new DeliveryTarget(channel, options, options.sender()));
+        deliveryTargets.put(eventId, new ChannelDeliveryTarget(channel, options, options.sender()));
         activeEngine.submit(pending);
+    }
+
+    /**
+     * Submits one already-filtered private message through the same bounded central engine.
+     *
+     * @return true when central moderation owns publication; false when the caller should fail open immediately
+     */
+    public boolean moderatePrivateAndSend(
+            UUID eventId,
+            RosePlayer sender,
+            RosePlayer recipient,
+            String message,
+            Runnable publisher,
+            Runnable blocked
+    ) {
+        Objects.requireNonNull(eventId, "eventId");
+        Objects.requireNonNull(sender, "sender");
+        Objects.requireNonNull(recipient, "recipient");
+        Objects.requireNonNull(message, "message");
+        Objects.requireNonNull(publisher, "publisher");
+        Objects.requireNonNull(blocked, "blocked");
+
+        AiModerationConfig current = this.config;
+        CentralModerationEngine activeEngine = this.engine;
+        UUID senderId = sender.getUUID();
+        if (current == null || !current.enabled() || activeEngine == null
+                || !sender.isPlayer() || senderId == null) {
+            return false;
+        }
+        if (deliveryTargets.size() >= MAX_DELIVERY_TARGETS) {
+            return false;
+        }
+
+        UUID recipientId = recipient.getUUID();
+        List<UUID> recipientIds = recipientId == null ? List.of() : List.of(recipientId);
+        String scopeId = current.centralScopeId().isBlank() ? "minecraft-private" : current.centralScopeId();
+        String conversationId = recipientId == null ? "" : privateConversationId(senderId, recipientId);
+        CentralModerationEngine.PendingMessage pending = new CentralModerationEngine.PendingMessage(
+                eventId,
+                ChannelProfile.MINECRAFT_PRIVATE,
+                scopeId,
+                "private",
+                conversationId,
+                recipientIds,
+                senderId,
+                safeName(sender),
+                message,
+                false
+        );
+        deliveryTargets.put(eventId, new PrivateDeliveryTarget(sender, publisher, blocked));
+        activeEngine.submit(pending);
+        return true;
+    }
+
+    private static String privateConversationId(UUID senderId, UUID recipientId) {
+        String first = senderId.toString();
+        String second = recipientId.toString();
+        return first.compareTo(second) <= 0
+                ? "minecraft-private:" + first + ':' + second
+                : "minecraft-private:" + second + ':' + first;
     }
 
     private boolean eligible(Channel channel, ChannelMessageOptions options, AiModerationConfig current) {
@@ -245,9 +305,15 @@ public final class AiModerationManager implements AutoCloseable, Listener {
             if (target == null) {
                 return;
             }
-            Set<UUID> beforeMessageIds = messageIds(target.sender());
-            target.channel().send(target.options());
-            beginResolvePublishedUuid(pending, target, beforeMessageIds, 0);
+            if (target instanceof ChannelDeliveryTarget channelTarget) {
+                Set<UUID> beforeMessageIds = messageIds(channelTarget.sender());
+                channelTarget.channel().send(channelTarget.options());
+                beginResolvePublishedUuid(pending, channelTarget, beforeMessageIds, 0);
+                return;
+            }
+            if (target instanceof PrivateDeliveryTarget privateTarget) {
+                Bukkit.getScheduler().runTask(plugin, privateTarget.publisher());
+            }
         }
 
         @Override
@@ -274,6 +340,12 @@ public final class AiModerationManager implements AutoCloseable, Listener {
 
         @Override
         public void audit(CentralModerationEngine.AuditRecord record) {
+            if ("CENTRAL_BLOCK_PRE_BROADCAST".equals(record.outcome())) {
+                DeliveryTarget target = deliveryTargets.remove(record.eventId());
+                if (target instanceof PrivateDeliveryTarget privateTarget) {
+                    Bukkit.getScheduler().runTask(plugin, privateTarget.blocked());
+                }
+            }
             AiModerationAuditStore store = auditStore;
             if (store == null) {
                 return;
@@ -288,7 +360,7 @@ public final class AiModerationManager implements AutoCloseable, Listener {
 
     private void beginResolvePublishedUuid(
             CentralModerationEngine.PendingMessage pending,
-            DeliveryTarget target,
+            ChannelDeliveryTarget target,
             Set<UUID> beforeMessageIds,
             int attempt
     ) {
@@ -310,7 +382,7 @@ public final class AiModerationManager implements AutoCloseable, Listener {
         });
     }
 
-    private UUID uniqueNewMessageId(DeliveryTarget target, Set<UUID> beforeMessageIds) {
+    private UUID uniqueNewMessageId(ChannelDeliveryTarget target, Set<UUID> beforeMessageIds) {
         if (target.sender().getPlayerData() == null) {
             return null;
         }
@@ -521,6 +593,21 @@ public final class AiModerationManager implements AutoCloseable, Listener {
         }
     }
 
-    private record DeliveryTarget(Channel channel, ChannelMessageOptions options, RosePlayer sender) {
+    private sealed interface DeliveryTarget permits ChannelDeliveryTarget, PrivateDeliveryTarget {
+        RosePlayer sender();
+    }
+
+    private record ChannelDeliveryTarget(
+            Channel channel,
+            ChannelMessageOptions options,
+            RosePlayer sender
+    ) implements DeliveryTarget {
+    }
+
+    private record PrivateDeliveryTarget(
+            RosePlayer sender,
+            Runnable publisher,
+            Runnable blocked
+    ) implements DeliveryTarget {
     }
 }
