@@ -9,6 +9,7 @@ import dev.rosewood.rosechat.moderation.ai.AiModerationMetrics;
 import dev.rosewood.rosechat.moderation.ai.AiModerationPolicy;
 import dev.rosewood.rosechat.moderation.ai.ModerationScores;
 import dev.rosewood.rosechat.moderation.ai.OpenAiModerationClient;
+import dev.rosewood.rosechat.moderation.ai.central.CentralCredentials;
 import dev.rosewood.rosegarden.RosePlugin;
 import dev.rosewood.rosegarden.command.framework.ArgumentsDefinition;
 import dev.rosewood.rosegarden.command.framework.CommandContext;
@@ -52,24 +53,24 @@ public class AiCommand extends RoseChatCommand {
     static void sendStatus(RoseChat plugin, CommandSender sender) {
         AiModerationConfig config = AiModerationConfig.load(plugin);
         AiModerationManager manager = plugin.getAiModerationManager();
-        KeyInfo key = resolveKey(plugin, config);
 
         sender.sendMessage("--- RoseChat AI Moderation ---");
         sender.sendMessage("Enabled: " + config.enabled());
         sender.sendMessage("Mode: " + (config.shadowMode() ? "SHADOW (no message enforcement)" : "ENFORCING MESSAGES"));
-        sender.sendMessage("Punishments: " + (config.punishmentsEnabled() ? "ENABLED" : "DISABLED (no strikes/mutes)"));
-        sender.sendMessage("Model: " + config.model());
-        sender.sendMessage("API key: " + (key.key().isBlank() ? "MISSING" : "configured via " + key.source()));
+        sender.sendMessage("Punishments: " + (config.punishmentsEnabled()
+                ? "LEGACY FLAG SET BUT IGNORED (central mode never auto-punishes)"
+                : "DISABLED (no strikes/mutes)"));
+        sender.sendMessage("Central service: " + (config.centralMode() ? "CONFIGURED (" + config.centralBaseUri() + ")" : "NOT CONFIGURED"));
+        if (config.centralMode()) {
+            sender.sendMessage("Central auth: " + CentralCredentials.resolve(config).safeSummary());
+        }
+        sender.sendMessage("Legacy OpenAI path: RETIRED as a production authority (diagnostics only)");
 
         if (manager == null) {
             sender.sendMessage("Health: NOT INITIALIZED");
         } else {
             AiModerationManager.Health health = manager.health();
-            String status = health.status().name();
-            if (health.status() == AiModerationManager.Status.HEALTHY && "configured".equalsIgnoreCase(health.detail())) {
-                status = "CONFIGURED (waiting for a successful request)";
-            }
-            sender.sendMessage("Health: " + status);
+            sender.sendMessage("Health: " + health.status().name());
             sender.sendMessage("Detail: " + health.detail());
 
             AiModerationMetrics.Snapshot metrics = manager.metrics();
@@ -77,20 +78,24 @@ public class AiCommand extends RoseChatCommand {
                     + " | success=" + metrics.successes()
                     + " | failed=" + metrics.failures()
                     + " | locally limited=" + metrics.rateLimited());
+            sender.sendMessage("Central: timeout=" + metrics.centralTimeouts()
+                    + " | unavailable=" + metrics.centralUnavailable()
+                    + " | conflict=" + metrics.centralConflicts()
+                    + " | degraded=" + metrics.centralDegraded());
             sender.sendMessage("Decisions: allow=" + metrics.allows()
-                    + " | alert=" + metrics.alerts()
+                    + " | block=" + metrics.centralBlocked()
                     + " | delete=" + metrics.deletes()
                     + " (late=" + metrics.lateDeletes() + ")"
-                    + " | shadow flags=" + metrics.shadowFlags());
+                    + " | legacy alert=" + metrics.alerts()
+                    + " | legacy shadow flags=" + metrics.shadowFlags());
             sender.sendMessage("Latency: p50=" + metrics.p50LatencyMs() + "ms"
                     + " | p95=" + metrics.p95LatencyMs() + "ms"
                     + " | p99=" + metrics.p99LatencyMs() + "ms");
         }
 
         sender.sendMessage("Max chat hold: " + config.maximumChatHold().toMillis() + "ms");
-        sender.sendMessage("Use /rosechat ai test to verify OpenAI now.");
-        sender.sendMessage("Use /rosechat ai inspect <message> to see scores without enforcing.");
-        sender.sendMessage("Inspect samples append to plugins/RoseChat/ai-moderation-calibration.jsonl.");
+        sender.sendMessage("Use /rosechat ai test to probe the CENTRAL service now.");
+        sender.sendMessage("Use /rosechat ai inspect <message> for the LEGACY OpenAI diagnostic (no enforcement).");
     }
 
     static CompletableFuture<ProbeResult> probe(RoseChat plugin, String message) {

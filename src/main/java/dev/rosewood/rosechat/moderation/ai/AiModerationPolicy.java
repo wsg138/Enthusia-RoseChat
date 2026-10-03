@@ -4,6 +4,16 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * RETIRED as a production decision authority (W13 central migration).
+ *
+ * <p>This local threshold policy must not independently decide production
+ * ALLOW/DELETE while central mode is active: the central Policy-v1 service is
+ * the single semantic authority. Retained, with its tests, for the explicitly
+ * labeled legacy OpenAI diagnostics ({@code /rosechat ai inspect}), which
+ * cannot enforce.</p>
+ */
+@Deprecated
 public final class AiModerationPolicy {
     private static final String SELF_HARM_INTENT = "self-harm/intent";
     private static final String SELF_HARM_INSTRUCTIONS = "self-harm/instructions";

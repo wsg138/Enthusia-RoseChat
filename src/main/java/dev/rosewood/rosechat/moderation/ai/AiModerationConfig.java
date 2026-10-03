@@ -29,7 +29,15 @@ public record AiModerationConfig(
         double corroborationFloorRatio,
         Map<String, Double> deleteThresholds,
         double selfHarmIntentAlertThreshold,
-        String staffStatusPermission
+        String staffStatusPermission,
+        // --- Central Policy-v1 moderation service (the single semantic authority) ---
+        boolean centralEnabled,
+        String centralBaseUri,
+        String centralClientId,
+        String centralClientIdEnvironmentVariable,
+        String centralTokenEnvironmentVariable,
+        String centralScopeId,
+        Duration centralRequestTimeout
 ) {
     static final int REQUIRED_AUTOMATIC_MUTE_STRIKES = 2;
     static final Duration REQUIRED_AUTOMATIC_MUTE_WINDOW = Duration.ofHours(1);
@@ -52,6 +60,12 @@ public record AiModerationConfig(
         Objects.requireNonNull(muteDuration, "muteDuration");
         Objects.requireNonNull(deleteThresholds, "deleteThresholds");
         Objects.requireNonNull(staffStatusPermission, "staffStatusPermission");
+        Objects.requireNonNull(centralBaseUri, "centralBaseUri");
+        Objects.requireNonNull(centralClientId, "centralClientId");
+        Objects.requireNonNull(centralClientIdEnvironmentVariable, "centralClientIdEnvironmentVariable");
+        Objects.requireNonNull(centralTokenEnvironmentVariable, "centralTokenEnvironmentVariable");
+        Objects.requireNonNull(centralScopeId, "centralScopeId");
+        Objects.requireNonNull(centralRequestTimeout, "centralRequestTimeout");
         deleteThresholds = Map.copyOf(deleteThresholds);
         if (maximumChatHold.isNegative() || maximumChatHold.toMillis() > 300) {
             throw new IllegalArgumentException("maximum-chat-hold-ms must be between 0 and 300");
@@ -76,6 +90,34 @@ public record AiModerationConfig(
         }
         if (corroborationFloorRatio <= 0 || corroborationFloorRatio > 1) {
             throw new IllegalArgumentException("corroboration-floor-ratio must be in (0, 1]");
+        }
+        if (!centralBaseUri.isBlank()) {
+            validateCentralBaseUri(centralBaseUri);
+        }
+        if (centralRequestTimeout.isZero() || centralRequestTimeout.isNegative()) {
+            throw new IllegalArgumentException("central request-timeout-ms must be positive");
+        }
+    }
+
+    /**
+     * Whether the central Policy-v1 service is the active semantic authority.
+     * When {@code true}, the legacy OpenAI threshold policy must not decide
+     * production ALLOW/DELETE and the local strike ledger must not escalate.
+     */
+    public boolean centralMode() {
+        return centralEnabled && !centralBaseUri.isBlank();
+    }
+
+    private static void validateCentralBaseUri(String value) {
+        try {
+            java.net.URI uri = java.net.URI.create(value.trim());
+            String scheme = uri.getScheme();
+            if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) {
+                throw new IllegalArgumentException(
+                        "central.base-uri must use http or https, got: " + value);
+            }
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("central.base-uri is not a valid URI: " + value);
         }
     }
 
@@ -130,7 +172,14 @@ public record AiModerationConfig(
                 boundedThreshold("corroboration-floor-ratio", yaml.getDouble("policy.corroboration-floor-ratio", 0.75)),
                 thresholds,
                 boundedThreshold("self-harm-intent-alert", yaml.getDouble("policy.self-harm-intent-alert", 0.85)),
-                staffPermission(yaml.getString("staff-status-permission"))
+                staffPermission(yaml.getString("staff-status-permission")),
+                yaml.getBoolean("central.enabled", true),
+                yaml.getString("central.base-uri", "").trim(),
+                yaml.getString("central.client-id", "").trim(),
+                nonBlank(yaml.getString("central.client-id-environment-variable"), "ROSECHAT_MODERATION_CLIENT_ID"),
+                nonBlank(yaml.getString("central.token-environment-variable"), "ROSECHAT_MODERATION_TOKEN"),
+                yaml.getString("central.scope-id", "").trim(),
+                Duration.ofMillis(yaml.getLong("central.request-timeout-ms", 2000))
         );
     }
 
@@ -165,7 +214,14 @@ public record AiModerationConfig(
                 0.75,
                 thresholds,
                 0.85,
-                DEFAULT_STAFF_STATUS_PERMISSION
+                DEFAULT_STAFF_STATUS_PERMISSION,
+                true,
+                "",
+                "",
+                "ROSECHAT_MODERATION_CLIENT_ID",
+                "ROSECHAT_MODERATION_TOKEN",
+                "",
+                Duration.ofSeconds(2)
         );
     }
 

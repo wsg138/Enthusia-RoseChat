@@ -14,6 +14,16 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * RETIRED as the production semantic decision path (W13 central migration).
+ *
+ * <p>Direct OpenAI moderation is no longer the production decision path; the
+ * central Policy-v1 service ({@code POST /v1/moderate}) is. This client is
+ * retained for the explicitly labeled legacy OpenAI diagnostics
+ * ({@code /rosechat ai test} probes the central service now;
+ * {@code /rosechat ai inspect} still uses this client and cannot enforce).</p>
+ */
+@Deprecated
 public final class OpenAiModerationClient {
     private static final URI ENDPOINT = URI.create("https://api.openai.com/v1/moderations");
 

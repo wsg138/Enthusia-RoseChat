@@ -4,11 +4,11 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-final class AiModerationTestConfig {
+public final class AiModerationTestConfig {
     private AiModerationTestConfig() {
     }
 
-    static AiModerationConfig create() {
+    public static AiModerationConfig create() {
         Map<String, Double> thresholds = new LinkedHashMap<>();
         thresholds.put("harassment", 0.97);
         thresholds.put("harassment/threatening", 0.78);
@@ -39,7 +39,48 @@ final class AiModerationTestConfig {
                 0.75,
                 thresholds,
                 0.55,
-                "rosechat.ai.alerts"
+                "rosechat.ai.alerts",
+                true,
+                "http://127.0.0.1:8080",
+                "rosechat-test",
+                "ROSECHAT_MODERATION_CLIENT_ID",
+                "ROSECHAT_MODERATION_TOKEN",
+                "test-scope",
+                Duration.ofSeconds(2)
+        );
+    }
+
+    public static AiModerationConfig createCentralDisabled() {
+        AiModerationConfig base = create();
+        return new AiModerationConfig(
+                base.enabled(),
+                base.shadowMode(),
+                base.punishmentsEnabled(),
+                base.model(),
+                base.apiKeyEnvironmentVariable(),
+                base.maximumChatHold(),
+                base.requestTimeout(),
+                base.beforeMessages(),
+                base.afterMessages(),
+                base.contextMaxAge(),
+                base.contextMaxCharacters(),
+                base.followUpDelay(),
+                base.failuresToOpen(),
+                base.circuitOpenDuration(),
+                base.requiredStrikes(),
+                base.strikeWindow(),
+                base.muteDuration(),
+                base.corroborationFloorRatio(),
+                base.deleteThresholds(),
+                base.selfHarmIntentAlertThreshold(),
+                base.staffStatusPermission(),
+                false,
+                "",
+                "",
+                base.centralClientIdEnvironmentVariable(),
+                base.centralTokenEnvironmentVariable(),
+                "",
+                base.centralRequestTimeout()
         );
     }
 }

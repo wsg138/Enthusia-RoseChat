@@ -41,7 +41,14 @@ class AiModerationConfigTest {
                 0.75D,
                 Map.of("harassment", 0.92D),
                 0.55D,
-                "rosechat.seeblocked"
+                "rosechat.seeblocked",
+                true,
+                "http://127.0.0.1:8080",
+                "rosechat-test",
+                "ROSECHAT_MODERATION_CLIENT_ID",
+                "ROSECHAT_MODERATION_TOKEN",
+                "test-scope",
+                Duration.ofSeconds(2)
         ));
     }
 
@@ -98,7 +105,14 @@ class AiModerationConfigTest {
                 0.75D,
                 Map.of("harassment", 0.92D),
                 0.55D,
-                "rosechat.seeblocked"
+                "rosechat.seeblocked",
+                true,
+                "http://127.0.0.1:8080",
+                "rosechat-test",
+                "ROSECHAT_MODERATION_CLIENT_ID",
+                "ROSECHAT_MODERATION_TOKEN",
+                "test-scope",
+                Duration.ofSeconds(2)
         );
     }
 }

@@ -1,26 +1,71 @@
-# Optional OpenAI chat moderation. Chat always fails open if this subsystem is unavailable.
+# RoseChat AI chat moderation. Chat always fails open if this subsystem is unavailable.
 enabled: false
 shadow-mode: true
 
+# --- Central Policy-v1 moderation service (Enthusia AI Moderation) ---
+# The central service is the SINGLE semantic moderation authority. When it is
+# enabled and configured below, RoseChat enforces only the central
+# message_action (ALLOW/BLOCK). The legacy OpenAI threshold policy, the local
+# strike ledger, and automatic punishment escalation are retired as production
+# authorities and are never consulted while central mode is active.
+central:
+  # Master switch for central mode. When false, no semantic moderation runs at
+  # all and chat passes through untouched (fail open).
+  enabled: true
+  # Base URI of the PRIVATE central service, e.g. http://10.0.0.5:8080
+  # Never use a public URL and never expose the moderation API publicly to
+  # solve routing. If RoseChat cannot reach this URI over the private network,
+  # chat keeps working (fail open) and staff are warned.
+  base-uri: ''
+  # Client ID for the X-Client-Id header. May be set here, or via the
+  # environment variable below when left blank.
+  client-id: ''
+  # Optional fallback for the client ID. Used only when client-id above is blank.
+  client-id-environment-variable: ROSECHAT_MODERATION_CLIENT_ID
+  # Bearer token is NEVER read from this file. Set the environment variable.
+  # Never commit a real secret to GitHub.
+  token-environment-variable: ROSECHAT_MODERATION_TOKEN
+  # Stable server scope sent as scope_id. When blank, the RoseChat channel id
+  # is used.
+  scope-id: ''
+  # Per-request deadline for POST /v1/moderate. The chat hold below still
+  # bounds publication: a slow service fails open and a late BLOCK deletes the
+  # exact published message.
+  request-timeout-ms: 2000
+
+# --- Legacy OpenAI path (RETIRED as a production authority) ---
+# These fields are kept so old files still parse, but they no longer drive any
+# production moderation decision. The central service above owns semantic
+# policy. /rosechat ai test and /rosechat ai inspect remain as explicitly
+# labeled legacy OpenAI diagnostics and cannot enforce.
+#
 # Message blocking/deletion and punishment escalation are separate rollout controls.
 # Set shadow-mode: false to enforce message decisions while keeping punishments disabled.
 punishments:
+  # RETIRED: has no effect in central mode. Central strike_recommendation and
+  # containment values are never converted into mutes/bans by RoseChat.
+  # EnthusiaStaff owns all punishment authority.
   enabled: false
 
-# Use the currently supported moderation alias. We observed HTTP 403 for the pinned
-# omni-moderation-2024-09-26 snapshot while this alias succeeds for the same project/key.
+# RETIRED: legacy OpenAI model alias. Ignored while central mode is active.
 model: omni-moderation-latest
 
-# Put the OpenAI API key here if you do not want to configure an environment variable.
+# RETIRED: legacy OpenAI API key. Ignored while central mode is active.
 # Keep this file private and never commit a real key to GitHub.
 api-key: ''
 
-# Optional fallback. Used only when api-key above is blank.
+# RETIRED: legacy OpenAI key fallback. Ignored while central mode is active.
 api-key-environment-variable: OPENAI_API_KEY
+
+# Chat availability budget: a central decision must arrive within this hold or
+# the message is published fail-open. Hard cap is 300 ms.
 maximum-chat-hold-ms: 200
+# RETIRED: legacy OpenAI request deadline. The central deadline above applies now.
 request-timeout-ms: 2000
 
 context:
+  # RETIRED: the central service owns bounded semantic context now. These
+  # values are parsed for migration compatibility but are not sent anywhere.
   before-messages: 6
   after-messages: 3
   max-age-seconds: 45
@@ -31,29 +76,25 @@ circuit-breaker:
   failures-to-open: 3
   open-seconds: 60
 
-# These values stay locked to the EnthusiaStaff automatic-mute contract for when punishments are enabled.
-# While punishments.enabled is false, DELETE decisions still block/remove messages but do not record strikes or request mutes.
+# RETIRED: the local strike ledger no longer creates AI punishment escalation.
+# Kept for migration compatibility only; nothing is recorded in central mode.
 strikes:
   required: 2
   window-minutes: 60
   mute-days: 30
 
 policy:
+  # RETIRED: legacy local OpenAI thresholds. The central Policy-v1 service is
+  # the only semantic authority; these values decide nothing in central mode.
   corroboration-floor-ratio: 0.75
-  # Plain harassment is intentionally conservative for Minecraft chat. Unlike the
-  # higher-risk categories below, surrounding context cannot promote this category
-  # into a DELETE decision; the message itself must clear this threshold.
   harassment: 0.97
   harassment-threatening: 0.78
   hate: 0.82
   hate-threatening: 0.70
-  # Slightly lower so abusive shorthand such as KYS crosses the instruction threshold.
   self-harm-instructions: 0.75
   sexual-minors: 0.65
   violence-graphic: 0.92
   illicit-violent: 0.92
-  # Higher than the first rollout to avoid Minecraft phrases such as "kill me bro"
-  # while still surfacing strong first-person self-harm intent for staff review.
   self-harm-intent-alert: 0.85
 
 # Dedicated permission for AI moderation staff notices. Do not grant this to normal players.

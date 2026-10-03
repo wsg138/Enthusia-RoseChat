@@ -42,7 +42,7 @@ public class AiInspectCommand extends RoseChatCommand {
     public void execute(CommandContext context, String message) {
         RoseChat plugin = (RoseChat) this.rosePlugin;
         CommandSender sender = context.getSender();
-        sender.sendMessage("Inspecting with OpenAI moderation; this does not enforce or add a strike.");
+        sender.sendMessage("Legacy OpenAI diagnostic (retired as a production authority); this does not enforce or add a strike.");
         AiCommand.probe(plugin, message)
                 .whenComplete((result, failure) -> Bukkit.getScheduler().runTask(plugin, () -> {
                     if (failure != null) {

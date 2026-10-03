@@ -12,6 +12,15 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * RETIRED as a production classifier input (W13 central migration).
+ *
+ * <p>The central Policy-v1 service owns bounded semantic context, restart
+ * continuity, and mirror aliases. RoseChat no longer sends a local prose
+ * transcript as classifier input. Retained, with its tests, for legacy
+ * diagnostic/shadow tooling during migration only.</p>
+ */
+@Deprecated
 public final class AiModerationContextBuffer {
     private final Clock clock;
     private final AiModerationConfig config;

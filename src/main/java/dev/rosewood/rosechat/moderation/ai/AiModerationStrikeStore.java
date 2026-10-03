@@ -21,6 +21,15 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.logging.Logger;
 
+/**
+ * RETIRED as a production authority (W13 central migration).
+ *
+ * <p>The local strike ledger no longer records AI enforcement or escalates to
+ * punishment requests: the central Policy-v1 service is the single semantic
+ * authority, and EnthusiaStaff owns all punishment/case authority. This class
+ * is retained, with its tests, as a migration artifact only.</p>
+ */
+@Deprecated
 final class AiModerationStrikeStore {
     private final Path file;
     private final Clock clock;
