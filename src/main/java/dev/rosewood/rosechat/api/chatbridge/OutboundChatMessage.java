@@ -9,7 +9,9 @@ import java.util.UUID;
  * <p>This DTO deliberately contains no DiscordSRV or JDA types. Rich InteractiveChat
  * rendering is a later stage and must retain {@link #plainText()} as its fallback.</p>
  *
- * @param eventId stable id used for duplicate suppression across the bridge
+ * @param eventId stable RoseChat event UUID used for duplicate suppression across the bridge
+ * @param externalMessageId stable Minecraft-side central moderation idempotency key
+ * @param canonicalMessageId stable logical ID shared with any Discord mirror of this message
  * @param createdAtEpochMillis creation time of this export
  * @param expiresAtEpochMillis hard expiry for best-effort delivery; expired chat must not be replayed
  * @param logicalChannelId RoseChat logical channel id used for explicit routing
@@ -21,6 +23,8 @@ import java.util.UUID;
  */
 public record OutboundChatMessage(
         UUID eventId,
+        String externalMessageId,
+        String canonicalMessageId,
         long createdAtEpochMillis,
         long expiresAtEpochMillis,
         String logicalChannelId,
@@ -44,6 +48,8 @@ public record OutboundChatMessage(
      */
     public OutboundChatMessage {
         if (eventId == null
+                || externalMessageId == null || externalMessageId.isBlank()
+                || canonicalMessageId == null || canonicalMessageId.isBlank()
                 || logicalChannelId == null || logicalChannelId.isBlank()
                 || classification == null
                 || origin == null
