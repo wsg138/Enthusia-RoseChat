@@ -204,7 +204,7 @@ public class DiscordSRVListener extends ListenerAdapter implements Listener {
 
             if (!MessageUtils.isMessageEmpty(line)) {
                 RoseMessage messageWrapper = RoseMessage.forChannel(sender, channel);
-                messageWrapper.setPlaceholders(placeholders.add("user_nickname", name).build());
+                messageWrapper.setPlaceholders(DiscordIdentityPlaceholders.add(placeholders, name, offlinePlayer != null).build());
 
                 MessageRules rules = new MessageRules();
                 if (Settings.REQUIRE_PERMISSIONS.get()) {
