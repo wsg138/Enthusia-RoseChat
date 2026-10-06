@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * outages, renderer/transport failures, or local pressure are reported to the caller
  * without throwing into the Minecraft chat path.</p>
  */
-public final class OutboundChatBridgeCoordinator {
+public final class OutboundChatBridgeCoordinator implements AutoCloseable {
 
     public static final int MAX_PLAIN_TEXT_LENGTH = 2_000;
     public static final int DEFAULT_MAX_DEDUPE_ENTRIES = 4_096;
@@ -157,6 +157,17 @@ public final class OutboundChatBridgeCoordinator {
      */
     private void pruneExpired(long now) {
         this.dedupeUntil.entrySet().removeIf(entry -> entry.getValue() < now);
+    }
+
+    /**
+     * Releases any installed bridge and bounded dedupe state during RoseChat shutdown.
+     */
+    @Override
+    public void close() {
+        this.bridge.set(null);
+        synchronized (this.dedupeLock) {
+            this.dedupeUntil.clear();
+        }
     }
 
     private record BridgeSlot(OutboundChatBridge bridge) { }
