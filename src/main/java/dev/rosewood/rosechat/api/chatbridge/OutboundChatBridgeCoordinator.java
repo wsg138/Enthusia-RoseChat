@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -15,7 +16,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * outages, renderer/transport failures, or local pressure are reported to the caller
  * without throwing into the Minecraft chat path.</p>
  */
-public final class OutboundChatBridgeCoordinator {
+public final class OutboundChatBridgeCoordinator implements AutoCloseable {
 
     public static final int MAX_PLAIN_TEXT_LENGTH = 2_000;
     public static final int DEFAULT_MAX_DEDUPE_ENTRIES = 4_096;
@@ -34,6 +35,7 @@ public final class OutboundChatBridgeCoordinator {
     }
 
     private final AtomicReference<BridgeSlot> bridge = new AtomicReference<>();
+    private final AtomicBoolean closed = new AtomicBoolean();
     private final Map<UUID, Long> dedupeUntil = new HashMap<>();
     private final Object dedupeLock = new Object();
     private final Clock clock;
@@ -70,9 +72,12 @@ public final class OutboundChatBridgeCoordinator {
      * @param outboundBridge provider to receive eligible messages
      * @return a registration that removes only the installation created by this call
      */
-    public Registration install(OutboundChatBridge outboundBridge) {
+    public synchronized Registration install(OutboundChatBridge outboundBridge) {
         if (outboundBridge == null) {
             throw new IllegalArgumentException("outbound chat bridge is required");
+        }
+        if (this.closed.get()) {
+            throw new IllegalStateException("outbound chat bridge coordinator is closed");
         }
 
         BridgeSlot slot = new BridgeSlot(outboundBridge);
@@ -89,6 +94,9 @@ public final class OutboundChatBridgeCoordinator {
      * @return the dispatch decision made by this safety boundary
      */
     public DispatchResult publish(OutboundChatMessage message) {
+        if (this.closed.get()) {
+            return DispatchResult.NO_BRIDGE;
+        }
         if (message.origin() != OutboundChatMessage.Origin.MINECRAFT) {
             return DispatchResult.LOOP_SUPPRESSED;
         }
@@ -157,6 +165,20 @@ public final class OutboundChatBridgeCoordinator {
      */
     private void pruneExpired(long now) {
         this.dedupeUntil.entrySet().removeIf(entry -> entry.getValue() < now);
+    }
+
+    /**
+     * Permanently closes this coordinator and releases its installed bridge and dedupe state.
+     */
+    @Override
+    public synchronized void close() {
+        if (!this.closed.compareAndSet(false, true)) {
+            return;
+        }
+        this.bridge.set(null);
+        synchronized (this.dedupeLock) {
+            this.dedupeUntil.clear();
+        }
     }
 
     private record BridgeSlot(OutboundChatBridge bridge) { }
