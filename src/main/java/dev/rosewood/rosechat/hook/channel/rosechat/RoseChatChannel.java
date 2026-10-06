@@ -353,6 +353,43 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
         });
     }
 
+    private void publishToOutboundBridge(RoseMessage message, MessageDirection direction) {
+        if (!shouldPublishOutboundBridge(direction, this.getSettings().shouldSendBungeeToDiscord()))
+            return;
+
+        RoseChat plugin = RoseChat.getInstance();
+        if (plugin.getStaffService() == null)
+            return;
+
+        UUID eventId = message.getUUID();
+        UUID senderId = message.getSender().getUUID();
+        String plainText = message.getPlayerInput();
+        String displayName = message.getSender().getRealName();
+        if (displayName == null || displayName.isBlank())
+            displayName = message.getSender().getName();
+
+        if (eventId == null || senderId == null || plainText == null
+                || displayName == null || displayName.isBlank())
+            return;
+
+        plugin.getOutboundChatBridgeRuntime().publish(
+                eventId,
+                senderId,
+                displayName,
+                plainText,
+                this.getId(),
+                plugin.getStaffService().classifyChannel(this.getId())
+        );
+    }
+
+    static boolean shouldPublishOutboundBridge(
+            MessageDirection direction,
+            boolean sendNetworkMessagesToDiscord
+    ) {
+        return direction == MessageDirection.PLAYER_TO_SERVER
+                || (direction == MessageDirection.SERVER_TO_SERVER && sendNetworkMessagesToDiscord);
+    }
+
     private void sendToDiscord(RoseMessage message, MessageDirection direction) {
         if (direction == MessageDirection.SERVER_TO_SERVER && !this.getSettings().shouldSendBungeeToDiscord())
             return;
@@ -560,6 +597,7 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
         // Disable spam filter for further messages.
         rules.ignoreMessageLogging();
 
+        this.publishToOutboundBridge(message, direction);
         this.sendToDiscord(message, direction);
         this.sendToBungee(message, direction);
 

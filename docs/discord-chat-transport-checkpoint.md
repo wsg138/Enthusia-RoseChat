@@ -12,7 +12,22 @@ Do not export from a parallel raw `AsyncChatEvent` listener. Doing so can observ
 
 The bridge must also reject any message classified `PRIVATE` or `STAFF`, and any message whose origin is Discord. Those checks are deliberately repeated in `OutboundChatBridgeCoordinator` as defense in depth.
 
-The initial API is not wired into `RoseChatChannel` in this checkpoint. That keeps the contract review independent from current DiscordSRV behavior and from the active AI-moderation PR. The next runtime checkpoint should add the small post-policy call while retaining the existing DiscordSRV send path until end-to-end replacement is verified.
+## Runtime checkpoint
+
+The provider-neutral bridge is now wired into `RoseChatChannel` at the reviewed post-policy seam:
+
+- the call occurs only after `allowChannelDispatch(...)` has accepted the message;
+- only canonical Minecraft-origin `PLAYER_TO_SERVER` messages are exported directly;
+- `SERVER_TO_SERVER` export follows the existing `shouldSendBungeeToDiscord()` decision so the replacement path does not create a second network fan-out policy;
+- `SERVER_TO_SERVER_RAW`, `MINECRAFT_TO_DISCORD`, and `DISCORD_TO_MINECRAFT` are not offered to the outbound bridge;
+- channel classification is resolved through the active RoseChat Staff service and is passed unchanged to `OutboundChatBridgeCoordinator`, which still rejects `PRIVATE` and `STAFF` traffic;
+- the bridge uses the existing RoseChat message UUID for stable `rosechat-mc-*` and `rosechat-canonical-*` identifiers;
+- each outbound candidate has a 30-second best-effort lifetime and no durable retry/outbox;
+- current `sendToDiscord(...)` DiscordSRV delivery remains in place immediately after the new bridge call.
+
+`RoseChatAPI.installOutboundChatBridge(...)` is the single-owner installation surface for the later Enthusia transport runtime. Installing a bridge does not disable DiscordSRV and does not create a Discord/JDA client inside RoseChat.
+
+This remains a dual-path migration checkpoint. Do not disable RoseChat DiscordSRV delivery until the Staff transport, StaffBot JDA egress, InteractiveChat renderer fork, routing, and non-production parity/acceptance work are complete.
 
 ## InteractiveChat addon split
 
@@ -79,7 +94,6 @@ This RoseChat checkpoint covers public outbound success, outage fail-open, loop 
 
 Later runtime/StaffBot/fork checkpoints still need coverage for:
 
-- the exact post-moderation RoseChat wiring including muted/rejected messages;
 - rich renderer success and renderer-failure plain-text fallback;
 - explicit routing failures;
 - authenticated Discord ingress validation and replay rejection;
