@@ -1,6 +1,7 @@
 package dev.rosewood.rosechat;
 
 import dev.rosewood.rosechat.api.RoseChatAPI;
+import dev.rosewood.rosechat.api.chatbridge.OutboundChatBridgeCoordinator;
 import dev.rosewood.rosechat.api.staff.RoseChatStaffService;
 import dev.rosewood.rosechat.chat.log.ConsoleMessageLog;
 import dev.rosewood.rosechat.chat.task.ChatLogTask;
@@ -77,6 +78,7 @@ public class RoseChat extends RosePlugin {
     private ConsoleMessageLog consoleLog;
     private ChatLogTask chatLogTask;
     private RoseChatStaffServiceImpl staffService;
+    private OutboundChatBridgeCoordinator outboundChatBridgeCoordinator;
     private AiModerationManager aiModerationManager;
 
     public RoseChat() {
@@ -116,6 +118,13 @@ public class RoseChat extends RosePlugin {
         this.getServer().getServicesManager().register(
                 RoseChatStaffService.class,
                 this.staffService,
+                this,
+                ServicePriority.Normal
+        );
+        this.outboundChatBridgeCoordinator = new OutboundChatBridgeCoordinator();
+        this.getServer().getServicesManager().register(
+                OutboundChatBridgeCoordinator.class,
+                this.outboundChatBridgeCoordinator,
                 this,
                 ServicePriority.Normal
         );
@@ -185,6 +194,15 @@ public class RoseChat extends RosePlugin {
 
     @Override
     public void disable() {
+        if (this.outboundChatBridgeCoordinator != null) {
+            this.getServer().getServicesManager().unregister(
+                    OutboundChatBridgeCoordinator.class,
+                    this.outboundChatBridgeCoordinator
+            );
+            this.outboundChatBridgeCoordinator.close();
+            this.outboundChatBridgeCoordinator = null;
+        }
+
         if (this.aiModerationManager != null) {
             this.aiModerationManager.close();
             this.aiModerationManager = null;
@@ -310,6 +328,9 @@ public class RoseChat extends RosePlugin {
 
     public RoseChatStaffServiceImpl getStaffService() {
         return this.staffService;
+    }
+    public OutboundChatBridgeCoordinator getOutboundChatBridgeCoordinator() {
+        return this.outboundChatBridgeCoordinator;
     }
 
     public AiModerationManager getAiModerationManager() {
