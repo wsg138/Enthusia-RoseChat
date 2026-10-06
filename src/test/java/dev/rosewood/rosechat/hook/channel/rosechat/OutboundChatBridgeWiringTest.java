@@ -33,7 +33,7 @@ class OutboundChatBridgeWiringTest {
         assertTrue(source.contains("direction != MessageDirection.DISCORD_TO_MINECRAFT"));
         assertTrue(source.contains("plugin.getStaffService().classifyChannel(this.getId())"));
         assertTrue(source.contains("? OutboundChatMessage.Origin.DISCORD"));
-        assertTrue(source.contains(""rosechat-mc-" + eventId"));
-        assertTrue(source.contains(""rosechat-canonical-" + eventId"));
+        assertTrue(source.contains("\"rosechat-mc-\" + eventId"));
+        assertTrue(source.contains("\"rosechat-canonical-\" + eventId"));
     }
 }
