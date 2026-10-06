@@ -240,6 +240,22 @@ class OutboundChatBridgeCoordinatorTest {
                         OutboundChatMessage.Origin.MINECRAFT, "closed")));
     }
 
+    /** Verifies plugin shutdown clears ownership and permanently prevents later installation. */
+    @Test
+    void closeReleasesBridgeAndPreventsReuse() {
+        OutboundChatBridgeCoordinator coordinator = coordinator();
+        AtomicInteger deliveries = new AtomicInteger();
+        coordinator.install(message -> deliveries.incrementAndGet());
+
+        coordinator.close();
+        coordinator.close();
+
+        assertEquals(OutboundChatBridgeCoordinator.DispatchResult.NO_BRIDGE,
+                coordinator.publish(message(UUID.randomUUID(), ChannelClassification.PUBLIC,
+                        OutboundChatMessage.Origin.MINECRAFT, "after plugin shutdown")));
+        assertEquals(0, deliveries.get());
+        assertThrows(IllegalStateException.class, () -> coordinator.install(message -> { }));
+    }
     /** Creates the default deterministic test coordinator. */
     private static OutboundChatBridgeCoordinator coordinator() {
         return new OutboundChatBridgeCoordinator(CLOCK, Duration.ofSeconds(30), 32);
