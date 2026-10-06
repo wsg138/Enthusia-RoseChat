@@ -2,6 +2,9 @@ package dev.rosewood.rosechat.hook.channel.rosechat;
 
 import dev.rosewood.rosechat.RoseChat;
 import dev.rosewood.rosechat.api.RoseChatAPI;
+import dev.rosewood.rosechat.api.chatbridge.OutboundChatBridgeCoordinator;
+import dev.rosewood.rosechat.api.chatbridge.OutboundChatMessage;
+import dev.rosewood.rosechat.api.staff.ChannelClassification;
 import dev.rosewood.rosechat.api.event.message.MessageReceivedEvent;
 import dev.rosewood.rosechat.api.event.message.PostParseMessageEvent;
 import dev.rosewood.rosechat.api.event.message.PreParseMessageEvent;
@@ -34,6 +37,8 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 
 public class RoseChatChannel extends ConditionalChannel implements Spyable {
+
+    private static final long OUTBOUND_CHAT_TTL_MILLIS = 15_000L;
 
     // Channel Settings
     protected int radius;
@@ -353,6 +358,50 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
         });
     }
 
+    private void publishToOutboundBridge(RoseMessage message, MessageDirection direction) {
+        // Export only locally-originated player chat. Discord-originated messages are offered only
+        // so the coordinator can enforce its loop-suppression boundary. Server-to-server relays are
+        // intentionally not exported because each backend owns its own coordinator/dedupe window.
+        if (direction != MessageDirection.PLAYER_TO_SERVER
+                && direction != MessageDirection.DISCORD_TO_MINECRAFT)
+            return;
+
+        RoseChat plugin = RoseChat.getInstance();
+        OutboundChatBridgeCoordinator coordinator = plugin.getOutboundChatBridgeCoordinator();
+        if (coordinator == null || plugin.getStaffService() == null)
+            return;
+
+        UUID eventId = message.getUUID();
+        UUID senderId = message.getSender().getUUID();
+        String plainText = message.getPlayerInput();
+        if (eventId == null || senderId == null || plainText == null)
+            return;
+
+        String displayName = message.getSender().getRealName();
+        if (displayName == null || displayName.isBlank())
+            displayName = message.getSender().getName();
+        if (displayName == null || displayName.isBlank())
+            return;
+
+        ChannelClassification classification = plugin.getStaffService().classifyChannel(this.getId());
+        OutboundChatMessage.Origin origin = direction == MessageDirection.DISCORD_TO_MINECRAFT
+                ? OutboundChatMessage.Origin.DISCORD
+                : OutboundChatMessage.Origin.MINECRAFT;
+        long now = System.currentTimeMillis();
+        coordinator.publish(new OutboundChatMessage(
+                eventId,
+                "rosechat-mc-" + eventId,
+                "rosechat-canonical-" + eventId,
+                now,
+                now + OUTBOUND_CHAT_TTL_MILLIS,
+                this.getId(),
+                classification,
+                origin,
+                senderId,
+                displayName,
+                plainText
+        ));
+    }
     private void sendToDiscord(RoseMessage message, MessageDirection direction) {
         if (direction == MessageDirection.SERVER_TO_SERVER && !this.getSettings().shouldSendBungeeToDiscord())
             return;
@@ -560,6 +609,10 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
         // Disable spam filter for further messages.
         rules.ignoreMessageLogging();
 
+        // Migration checkpoint: publish the already policy-approved message to the provider-neutral
+        // bridge while the existing DiscordSRV writer remains active. Network relays are excluded
+        // in publishToOutboundBridge so one Minecraft message is not exported once per backend.
+        this.publishToOutboundBridge(message, direction);
         this.sendToDiscord(message, direction);
         this.sendToBungee(message, direction);
 
