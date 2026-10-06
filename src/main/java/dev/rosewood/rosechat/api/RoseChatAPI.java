@@ -1,6 +1,8 @@
 package dev.rosewood.rosechat.api;
 
 import dev.rosewood.rosechat.RoseChat;
+import dev.rosewood.rosechat.api.chatbridge.OutboundChatBridge;
+import dev.rosewood.rosechat.api.chatbridge.OutboundChatBridgeCoordinator;
 import dev.rosewood.rosechat.api.deletion.AdventureMessageDeletionHelper;
 import dev.rosewood.rosechat.api.deletion.BungeeMessageDeletionHelper;
 import dev.rosewood.rosechat.api.deletion.MessageDeletionHelper;
@@ -375,6 +377,16 @@ public final class RoseChatAPI {
      */
     public DiscordChatProvider getDiscord() {
         return this.plugin.getDiscord();
+    }
+
+    /**
+     * Installs the single active provider-neutral outbound chat bridge.
+     *
+     * @param bridge bridge implementation owned by the external transport runtime
+     * @return registration that removes only this installation
+     */
+    public OutboundChatBridgeCoordinator.Registration installOutboundChatBridge(OutboundChatBridge bridge) {
+        return this.plugin.getOutboundChatBridgeCoordinator().install(bridge);
     }
 
     /**
