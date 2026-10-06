@@ -12,7 +12,18 @@ Do not export from a parallel raw `AsyncChatEvent` listener. Doing so can observ
 
 The bridge must also reject any message classified `PRIVATE` or `STAFF`, and any message whose origin is Discord. Those checks are deliberately repeated in `OutboundChatBridgeCoordinator` as defense in depth.
 
-The initial API is not wired into `RoseChatChannel` in this checkpoint. That keeps the contract review independent from current DiscordSRV behavior and from the active AI-moderation PR. The next runtime checkpoint should add the small post-policy call while retaining the existing DiscordSRV send path until end-to-end replacement is verified.
+The contract checkpoint is now followed by a bounded runtime-wiring checkpoint:
+
+- RoseChat owns one `OutboundChatBridgeCoordinator` and registers it through Bukkit's service manager for a future provider.
+- `RoseChatChannel.send(...)` invokes the coordinator only after `allowChannelDispatch(...)` accepts the message.
+- only local `PLAYER_TO_SERVER` traffic is eligible for export; `SERVER_TO_SERVER` relays are skipped so a network message is not exported once per backend.
+- Discord-originated traffic is offered with origin `DISCORD` only to enforce the coordinator's loop-suppression boundary.
+- channel privacy is classified through the existing staff service before publication, and the coordinator still independently rejects `PRIVATE`/`STAFF`.
+- the filtered `RoseMessage.playerInput` is the plain-text fallback, not the raw pre-filter input.
+- the current DiscordSRV `sendToDiscord(...)` call remains in place immediately after the provider-neutral publication call.
+- RoseChat shutdown unregisters and permanently closes the coordinator, preventing a stale provider registration from surviving plugin disable.
+
+No replacement transport is installed by this checkpoint, so production Discord delivery remains unchanged. A later Staff transport checkpoint must use this service in shadow/non-duplicating form until the DiscordSRV path is explicitly cut over.
 
 ## InteractiveChat addon split
 
