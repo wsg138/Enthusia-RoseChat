@@ -240,6 +240,31 @@ class OutboundChatBridgeCoordinatorTest {
                         OutboundChatMessage.Origin.MINECRAFT, "closed")));
     }
 
+    /** Verifies plugin shutdown releases both the active bridge and dedupe reservations. */
+    @Test
+    void closeReleasesBridgeAndDedupeState() {
+        OutboundChatBridgeCoordinator coordinator = new OutboundChatBridgeCoordinator(
+                CLOCK, Duration.ofSeconds(30), 1);
+        AtomicInteger deliveries = new AtomicInteger();
+        coordinator.install(message -> deliveries.incrementAndGet());
+        UUID firstId = UUID.randomUUID();
+
+        assertEquals(OutboundChatBridgeCoordinator.DispatchResult.DELIVERED,
+                coordinator.publish(message(firstId, ChannelClassification.PUBLIC,
+                        OutboundChatMessage.Origin.MINECRAFT, "before close")));
+
+        coordinator.close();
+        assertEquals(OutboundChatBridgeCoordinator.DispatchResult.NO_BRIDGE,
+                coordinator.publish(message(UUID.randomUUID(), ChannelClassification.PUBLIC,
+                        OutboundChatMessage.Origin.MINECRAFT, "no bridge")));
+
+        coordinator.install(message -> deliveries.incrementAndGet());
+        assertEquals(OutboundChatBridgeCoordinator.DispatchResult.DELIVERED,
+                coordinator.publish(message(firstId, ChannelClassification.PUBLIC,
+                        OutboundChatMessage.Origin.MINECRAFT, "dedupe cleared")));
+        assertEquals(2, deliveries.get());
+    }
+
     /** Creates the default deterministic test coordinator. */
     private static OutboundChatBridgeCoordinator coordinator() {
         return new OutboundChatBridgeCoordinator(CLOCK, Duration.ofSeconds(30), 32);
