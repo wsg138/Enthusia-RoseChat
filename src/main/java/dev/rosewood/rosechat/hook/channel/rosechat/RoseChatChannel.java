@@ -490,13 +490,10 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
     }
 
     private void sendToDiscord(RoseMessage message, MessageDirection direction) {
-        if (RoseChat.getInstance().getLegacyDiscordChatSuppression().suppressed())
-            return;
-
-        if (direction == MessageDirection.SERVER_TO_SERVER && !this.getSettings().shouldSendBungeeToDiscord())
-            return;
-
-        if (direction == MessageDirection.DISCORD_TO_MINECRAFT || direction == MessageDirection.SERVER_TO_SERVER_RAW)
+        if (!shouldSendLegacyDiscord(
+                RoseChat.getInstance().getLegacyDiscordChatSuppression().suppressed(),
+                direction,
+                this.getSettings().shouldSendBungeeToDiscord()))
             return;
 
         RoseChatAPI api = RoseChatAPI.getInstance();
@@ -510,6 +507,19 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
 
         RoseChat.MESSAGE_THREAD_POOL.execute(() ->
                 api.getDiscord().sendMessage(message, this, this.getSettings().getDiscord()));
+    }
+
+    static boolean shouldSendLegacyDiscord(
+            boolean suppressed,
+            MessageDirection direction,
+            boolean sendNetworkMessagesToDiscord
+    ) {
+        if (suppressed || direction == null)
+            return false;
+        if (direction == MessageDirection.SERVER_TO_SERVER)
+            return sendNetworkMessagesToDiscord;
+        return direction != MessageDirection.DISCORD_TO_MINECRAFT
+                && direction != MessageDirection.SERVER_TO_SERVER_RAW;
     }
 
     private void sendToBungee(RoseMessage message, MessageDirection direction) {
