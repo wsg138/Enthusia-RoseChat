@@ -29,6 +29,42 @@ The provider-neutral bridge is now wired into `RoseChatChannel` at the reviewed 
 
 This remains a dual-path migration checkpoint. Do not disable RoseChat DiscordSRV delivery until the Staff transport, StaffBot JDA egress, InteractiveChat renderer fork, routing, and non-production parity/acceptance work are complete.
 
+## Provider-neutral Discord ingress checkpoint
+
+The next migration checkpoint exposes one canonical RoseChat API for authenticated
+Discord-to-Minecraft messages without changing the active DiscordSRV listener.
+
+`RoseChatAPI.acceptInboundDiscordChat(...)` accepts only the bounded
+`InboundDiscordChatMessage` contract. Network authentication and Discord-channel
+to Minecraft-server routing remain responsibilities of the external Enthusia
+transport. RoseChat then independently enforces:
+
+- a short maximum message lifetime and bounded duplicate cache;
+- exact logical RoseChat channel lookup;
+- public-channel classification through the current Staff policy service;
+- channel mute state;
+- RoseChat message filters;
+- bounded line/attachment counts;
+- HTTPS-only attachment references that are displayed as links and never fetched;
+- linked Minecraft UUID authority separated from Discord presentation fields.
+
+Accepted messages are converted into a Discord-proxy `RosePlayer` and dispatched
+through the existing `ChannelMessageOptions.wrapper(...)` seam. That makes the
+existing `DISCORD_TO_MINECRAFT` direction authoritative for Staff preflight,
+recipient policy, parsing, message logging, and loop suppression. The path never
+calls the Minecraft-to-Discord or Bungee fan-out stages.
+
+Terminal policy/configuration rejections such as blocked content, private/staff
+channels, muted channels, unknown routes, duplicates, and expired messages are
+acknowledged-and-dropped so a transport cannot retry rejected chat until expiry.
+Only transient RoseChat policy unavailability, dedupe saturation, or an internal
+dispatch failure remain retryable within the original message TTL.
+
+This checkpoint does **not** yet install StaffBot/Velocity/Paper ingress transport,
+disable the DiscordSRV listener, replace Discord message edit/delete handling, or
+authorize production routing. DiscordSRV remains the live inbound provider while
+the authenticated Enthusia transport is implemented and tested separately.
+
 ## InteractiveChat addon split
 
 The official `LOOHP/InteractiveChat-DiscordSRV-Addon` cannot survive DiscordSRV removal unchanged because its plugin metadata hard-depends on both `InteractiveChat` and `DiscordSRV`.
