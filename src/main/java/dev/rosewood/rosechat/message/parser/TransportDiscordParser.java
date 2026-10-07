@@ -6,7 +6,6 @@ import dev.rosewood.rosechat.message.RoseMessage;
 import dev.rosewood.rosechat.message.RosePlayer;
 import dev.rosewood.rosechat.message.contents.MessageContents;
 import dev.rosewood.rosechat.message.tokenizer.MessageTokenizer;
-import dev.rosewood.rosechat.message.tokenizer.TokenizerBundle;
 import dev.rosewood.rosechat.message.tokenizer.Tokenizers;
 
 /**
@@ -21,7 +20,7 @@ public final class TransportDiscordParser implements MessageParser {
 
     public static final MessageParser INSTANCE = new TransportDiscordParser();
 
-    private static final TokenizerBundle SAFE_TO_DISCORD = new TokenizerBundle(
+    private static final Tokenizers.TokenizerBundle SAFE_TO_DISCORD = new Tokenizers.TokenizerBundle(
             "transport_to_discord",
             Tokenizers.TO_DISCORD_URL,
             Tokenizers.TO_DISCORD_SPOILER
