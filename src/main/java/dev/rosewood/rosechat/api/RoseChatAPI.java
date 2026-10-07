@@ -2,6 +2,7 @@ package dev.rosewood.rosechat.api;
 
 import dev.rosewood.rosechat.RoseChat;
 import dev.rosewood.rosechat.api.chatbridge.InboundChatMessage;
+import dev.rosewood.rosechat.api.chatbridge.LegacyDiscordChatSuppression;
 import dev.rosewood.rosechat.api.chatbridge.OutboundChatBridge;
 import dev.rosewood.rosechat.api.chatbridge.OutboundChatBridgeCoordinator;
 import dev.rosewood.rosechat.api.chatbridge.OutboundChatRenderBridge;
@@ -382,6 +383,25 @@ public final class RoseChatAPI {
      */
     public DiscordChatProvider getDiscord() {
         return this.plugin.getDiscord();
+    }
+
+    /**
+     * Suppresses RoseChat's legacy Discord provider while an external transport is authoritative.
+     *
+     * <p>The suppression is lifecycle-scoped and reversible. Closing the returned registration
+     * restores the legacy send path when this registration still owns the suppression slot.</p>
+     *
+     * @return registration that releases this suppression
+     */
+    public LegacyDiscordChatSuppression.Registration suppressLegacyDiscordChat() {
+        return this.plugin.getLegacyDiscordChatSuppression().suppress();
+    }
+
+    /**
+     * @return {@code true} when RoseChat's legacy Discord provider is currently suppressed
+     */
+    public boolean isLegacyDiscordChatSuppressed() {
+        return this.plugin.getLegacyDiscordChatSuppression().suppressed();
     }
 
     /**
