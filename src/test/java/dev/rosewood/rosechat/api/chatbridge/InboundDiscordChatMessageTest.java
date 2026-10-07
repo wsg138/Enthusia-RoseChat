@@ -34,6 +34,8 @@ class InboundDiscordChatMessageTest {
         assertEquals(1, message.attachmentUrls().size());
         assertFalse(message.isExpired(CREATED + 30_000L));
         assertTrue(message.isExpired(CREATED + 30_001L));
+        assertFalse(message.isFutureDated(CREATED));
+        assertTrue(message.isFutureDated(CREATED - InboundDiscordChatMessage.MAX_FUTURE_SKEW_MILLIS - 1L));
         assertThrows(UnsupportedOperationException.class,
                 () -> message.attachmentUrls().add("https://example.com/extra"));
     }
@@ -138,10 +140,11 @@ class InboundDiscordChatMessageTest {
         assertTrue(InboundChatResult.BLOCKED.acknowledged());
         assertTrue(InboundChatResult.CHANNEL_NOT_PUBLIC.acknowledged());
         assertTrue(InboundChatResult.EXPIRED.acknowledged());
+        assertTrue(InboundChatResult.INVALID_TIME.acknowledged());
+        assertTrue(InboundChatResult.FAILED.acknowledged());
 
         assertFalse(InboundChatResult.POLICY_UNAVAILABLE.acknowledged());
         assertFalse(InboundChatResult.SATURATED.acknowledged());
-        assertFalse(InboundChatResult.FAILED.acknowledged());
     }
 
     private static InboundDiscordChatMessage message(List<String> attachments, long lifetime) {
