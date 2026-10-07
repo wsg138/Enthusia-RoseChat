@@ -15,6 +15,7 @@ public enum InboundChatResult {
     INVALID_TIME(true),
     POLICY_UNAVAILABLE(false),
     CHANNEL_NOT_FOUND(true),
+    CHANNEL_UNSUPPORTED(true),
     CHANNEL_NOT_PUBLIC(true),
     CHANNEL_MUTED(true),
     SATURATED(false),
