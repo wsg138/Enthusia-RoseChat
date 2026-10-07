@@ -139,6 +139,7 @@ class InboundDiscordChatMessageTest {
         assertTrue(InboundChatResult.DUPLICATE.acknowledged());
         assertTrue(InboundChatResult.BLOCKED.acknowledged());
         assertTrue(InboundChatResult.CHANNEL_NOT_PUBLIC.acknowledged());
+        assertTrue(InboundChatResult.CHANNEL_UNSUPPORTED.acknowledged());
         assertTrue(InboundChatResult.EXPIRED.acknowledged());
         assertTrue(InboundChatResult.INVALID_TIME.acknowledged());
         assertTrue(InboundChatResult.FAILED.acknowledged());
