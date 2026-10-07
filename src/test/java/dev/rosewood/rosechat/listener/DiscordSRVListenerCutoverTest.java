@@ -3,16 +3,17 @@ package dev.rosewood.rosechat.listener;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.rosewood.rosechat.api.chatbridge.LegacyDiscordChatPolicy;
 import org.junit.jupiter.api.Test;
 
 class DiscordSRVListenerCutoverTest {
 
     @Test
     void legacyInboundRequiresDiscordEnabledAndNoAuthoritativeSuppression() {
-        assertTrue(DiscordSRVListener.legacyDiscordInboundAllowed(true, false));
+        assertTrue(LegacyDiscordChatPolicy.inboundAllowed(true, false));
 
-        assertFalse(DiscordSRVListener.legacyDiscordInboundAllowed(false, false));
-        assertFalse(DiscordSRVListener.legacyDiscordInboundAllowed(true, true));
-        assertFalse(DiscordSRVListener.legacyDiscordInboundAllowed(false, true));
+        assertFalse(LegacyDiscordChatPolicy.inboundAllowed(false, false));
+        assertFalse(LegacyDiscordChatPolicy.inboundAllowed(true, true));
+        assertFalse(LegacyDiscordChatPolicy.inboundAllowed(false, true));
     }
 }
