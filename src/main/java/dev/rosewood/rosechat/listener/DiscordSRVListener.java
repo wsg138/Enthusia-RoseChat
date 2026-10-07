@@ -4,6 +4,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import dev.rosewood.rosechat.RoseChat;
 import dev.rosewood.rosechat.api.RoseChatAPI;
+import dev.rosewood.rosechat.api.chatbridge.LegacyDiscordChatPolicy;
 import dev.rosewood.rosechat.chat.PlayerData;
 import dev.rosewood.rosechat.chat.channel.Channel;
 import dev.rosewood.rosechat.chat.channel.ChannelMessageOptions;
@@ -191,15 +192,11 @@ public class DiscordSRVListener extends ListenerAdapter implements Listener {
         }
     }
 
-    boolean legacyDiscordInboundAllowed() {
-        return legacyDiscordInboundAllowed(
+    private boolean legacyDiscordInboundAllowed() {
+        return LegacyDiscordChatPolicy.inboundAllowed(
                 Settings.USE_DISCORD.get(),
                 this.api.isLegacyDiscordChatSuppressed()
         );
-    }
-
-    static boolean legacyDiscordInboundAllowed(boolean useDiscord, boolean suppressed) {
-        return useDiscord && !suppressed;
     }
 
     private void createMessage(Message message, OfflinePlayer offlinePlayer, String name, Channel channel, StringPlaceholders.Builder placeholders, boolean update, List<PlayerData> updateFor) {
