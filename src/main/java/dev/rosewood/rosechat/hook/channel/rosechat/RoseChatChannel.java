@@ -490,6 +490,9 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
     }
 
     private void sendToDiscord(RoseMessage message, MessageDirection direction) {
+        if (RoseChat.getInstance().getLegacyDiscordChatSuppression().suppressed())
+            return;
+
         if (direction == MessageDirection.SERVER_TO_SERVER && !this.getSettings().shouldSendBungeeToDiscord())
             return;
 
