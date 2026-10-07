@@ -54,7 +54,9 @@ public class DiscordSRVListener extends ListenerAdapter implements Listener {
 
     @Override
     public void onGuildMessageUpdate(GuildMessageUpdateEvent event) {
-        if (!Settings.USE_DISCORD.get() || !Settings.EDIT_DISCORD_MESSAGES.get() || Settings.SUPPORT_THIRD_PARTY_PLUGINS.get())
+        if (!legacyDiscordInboundAllowed()
+                || !Settings.EDIT_DISCORD_MESSAGES.get()
+                || Settings.SUPPORT_THIRD_PARTY_PLUGINS.get())
             return;
 
         RoseChatAPI api = RoseChatAPI.getInstance();
@@ -74,7 +76,9 @@ public class DiscordSRVListener extends ListenerAdapter implements Listener {
 
     @Override
     public void onGuildMessageDelete(GuildMessageDeleteEvent event) {
-        if (!Settings.ENABLE_DELETING_MESSAGES.get() || !Settings.USE_DISCORD.get() || Settings.SUPPORT_THIRD_PARTY_PLUGINS.get())
+        if (!Settings.ENABLE_DELETING_MESSAGES.get()
+                || !legacyDiscordInboundAllowed()
+                || Settings.SUPPORT_THIRD_PARTY_PLUGINS.get())
             return;
 
         RoseChatAPI api = RoseChatAPI.getInstance();
@@ -111,13 +115,15 @@ public class DiscordSRVListener extends ListenerAdapter implements Listener {
             return;
 
         event.setCancelled(true);
+        if (this.api.isLegacyDiscordChatSuppressed())
+            return;
         Bukkit.getScheduler().runTaskAsynchronously(RoseChat.getInstance(), () -> {
             this.processMessage(event.getChannel(), event.getMember(), event.getMessage(), false, null);
         });
     }
 
     public void processMessage(TextChannel discordChannel, Member member, Message message, boolean update, List<PlayerData> updateFor) {
-        if (member == null)
+        if (!legacyDiscordInboundAllowed() || member == null)
             return;
 
         for (Channel channel : this.api.getChannels()) {
@@ -183,6 +189,17 @@ public class DiscordSRVListener extends ListenerAdapter implements Listener {
 
             return;
         }
+    }
+
+    boolean legacyDiscordInboundAllowed() {
+        return legacyDiscordInboundAllowed(
+                Settings.USE_DISCORD.get(),
+                this.api.isLegacyDiscordChatSuppressed()
+        );
+    }
+
+    static boolean legacyDiscordInboundAllowed(boolean useDiscord, boolean suppressed) {
+        return useDiscord && !suppressed;
     }
 
     private void createMessage(Message message, OfflinePlayer offlinePlayer, String name, Channel channel, StringPlaceholders.Builder placeholders, boolean update, List<PlayerData> updateFor) {
