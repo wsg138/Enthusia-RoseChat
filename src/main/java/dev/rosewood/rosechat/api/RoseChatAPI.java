@@ -1,6 +1,8 @@
 package dev.rosewood.rosechat.api;
 
 import dev.rosewood.rosechat.RoseChat;
+import dev.rosewood.rosechat.api.chatbridge.InboundChatResult;
+import dev.rosewood.rosechat.api.chatbridge.InboundDiscordChatMessage;
 import dev.rosewood.rosechat.api.chatbridge.OutboundChatBridge;
 import dev.rosewood.rosechat.api.chatbridge.OutboundChatBridgeCoordinator;
 import dev.rosewood.rosechat.api.deletion.AdventureMessageDeletionHelper;
@@ -387,6 +389,20 @@ public final class RoseChatAPI {
      */
     public OutboundChatBridgeCoordinator.Registration installOutboundChatBridge(OutboundChatBridge bridge) {
         return this.plugin.getOutboundChatBridgeCoordinator().install(bridge);
+    }
+
+    /**
+     * Admits one authenticated Discord message into RoseChat's canonical Discord-origin path.
+     *
+     * <p>The caller owns transport authentication and Discord channel-to-Minecraft-server routing.
+     * RoseChat rechecks logical-channel privacy, mute/filter policy, expiry and duplicate identity
+     * before dispatch. This method never sends the message back to Discord.</p>
+     *
+     * @param message bounded provider-neutral Discord message
+     * @return RoseChat admission result
+     */
+    public InboundChatResult acceptInboundDiscordChat(InboundDiscordChatMessage message) {
+        return this.plugin.getInboundChatBridgeRuntime().accept(message);
     }
 
     /**
