@@ -4,6 +4,8 @@ import dev.rosewood.rosechat.RoseChat;
 import dev.rosewood.rosechat.api.chatbridge.InboundChatMessage;
 import dev.rosewood.rosechat.api.chatbridge.OutboundChatBridge;
 import dev.rosewood.rosechat.api.chatbridge.OutboundChatBridgeCoordinator;
+import dev.rosewood.rosechat.api.chatbridge.OutboundChatRenderBridge;
+import dev.rosewood.rosechat.api.chatbridge.OutboundChatRenderBridgeCoordinator;
 import dev.rosewood.rosechat.api.deletion.AdventureMessageDeletionHelper;
 import dev.rosewood.rosechat.api.deletion.BungeeMessageDeletionHelper;
 import dev.rosewood.rosechat.api.deletion.MessageDeletionHelper;
@@ -390,6 +392,21 @@ public final class RoseChatAPI {
      */
     public OutboundChatBridgeCoordinator.Registration installOutboundChatBridge(OutboundChatBridge bridge) {
         return this.plugin.getOutboundChatBridgeCoordinator().install(bridge);
+    }
+
+    /**
+     * Installs the single active provider-neutral styled outbound chat renderer.
+     *
+     * <p>When installed, RoseChat may offer the resolved body/full-line render to this bridge
+     * instead of the plain V1 bridge. The render always contains a formatting-free fallback.</p>
+     *
+     * @param bridge styled render transport owned by an external runtime
+     * @return registration that removes only this installation
+     */
+    public OutboundChatRenderBridgeCoordinator.Registration installOutboundChatRenderBridge(
+            OutboundChatRenderBridge bridge
+    ) {
+        return this.plugin.getOutboundChatRenderBridgeCoordinator().install(bridge);
     }
 
     /**
