@@ -1,6 +1,7 @@
 package dev.rosewood.rosechat;
 
 import dev.rosewood.rosechat.api.RoseChatAPI;
+import dev.rosewood.rosechat.api.chatbridge.LegacyDiscordChatSuppression;
 import dev.rosewood.rosechat.api.chatbridge.OutboundChatBridgeCoordinator;
 import dev.rosewood.rosechat.api.chatbridge.OutboundChatBridgeRuntime;
 import dev.rosewood.rosechat.api.chatbridge.OutboundChatRenderBridgeCoordinator;
@@ -82,6 +83,8 @@ public class RoseChat extends RosePlugin {
     private ChatLogTask chatLogTask;
     private RoseChatStaffServiceImpl staffService;
     private AiModerationManager aiModerationManager;
+    private final LegacyDiscordChatSuppression legacyDiscordChatSuppression =
+            new LegacyDiscordChatSuppression();
     private final OutboundChatBridgeCoordinator outboundChatBridgeCoordinator = new OutboundChatBridgeCoordinator();
     private final OutboundChatBridgeRuntime outboundChatBridgeRuntime = new OutboundChatBridgeRuntime(this.outboundChatBridgeCoordinator);
     private final OutboundChatRenderBridgeCoordinator outboundChatRenderBridgeCoordinator =
@@ -195,6 +198,7 @@ public class RoseChat extends RosePlugin {
 
     @Override
     public void disable() {
+        this.legacyDiscordChatSuppression.close();
         this.outboundChatRenderBridgeCoordinator.close();
         this.outboundChatBridgeCoordinator.close();
 
@@ -327,6 +331,10 @@ public class RoseChat extends RosePlugin {
 
     public AiModerationManager getAiModerationManager() {
         return this.aiModerationManager;
+    }
+
+    public LegacyDiscordChatSuppression getLegacyDiscordChatSuppression() {
+        return this.legacyDiscordChatSuppression;
     }
 
     public OutboundChatBridgeCoordinator getOutboundChatBridgeCoordinator() {
