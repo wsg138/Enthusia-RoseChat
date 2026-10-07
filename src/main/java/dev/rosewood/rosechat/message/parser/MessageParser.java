@@ -32,4 +32,8 @@ public interface MessageParser {
         return ToDiscordParser.INSTANCE;
     }
 
+    static MessageParser transportDiscord() {
+        return TransportDiscordParser.INSTANCE;
+    }
+
 }

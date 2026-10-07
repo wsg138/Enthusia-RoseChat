@@ -107,6 +107,17 @@ public class RoseMessage {
     }
 
     /**
+     * Parses this message for an external Discord transport without consulting DiscordSRV/JDA.
+     *
+     * @param viewer sender/viewer context used by RoseChat placeholders and permissions
+     * @param format normal RoseChat chat format to render
+     * @return parsed provider-neutral contents retaining RoseChat styling semantics
+     */
+    public MessageContents parseMessageForDiscordTransport(RosePlayer viewer, String format) {
+        return this.parse(MessageParser.transportDiscord(), viewer, format, null);
+    }
+
+    /**
      * Parses the message.
      * This allows for the message to gain hover and click events, along with emojis and other features.
      * This applies a parser to parse with specific settings for bungee messages.

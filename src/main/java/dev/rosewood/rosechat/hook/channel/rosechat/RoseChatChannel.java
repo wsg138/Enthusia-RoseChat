@@ -2,6 +2,8 @@ package dev.rosewood.rosechat.hook.channel.rosechat;
 
 import dev.rosewood.rosechat.RoseChat;
 import dev.rosewood.rosechat.api.RoseChatAPI;
+import dev.rosewood.rosechat.api.chatbridge.OutboundChatRenderBridgeCoordinator;
+import dev.rosewood.rosechat.api.staff.ChannelClassification;
 import dev.rosewood.rosechat.api.event.message.MessageReceivedEvent;
 import dev.rosewood.rosechat.api.event.message.PostParseMessageEvent;
 import dev.rosewood.rosechat.api.event.message.PreParseMessageEvent;
@@ -353,7 +355,11 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
         });
     }
 
-    private void publishToOutboundBridge(RoseMessage message, MessageDirection direction) {
+    private void publishToOutboundBridge(
+            RoseMessage message,
+            MessageDirection direction,
+            String lineFormat
+    ) {
         if (!shouldPublishOutboundBridge(direction, this.getSettings().shouldSendBungeeToDiscord()))
             return;
 
@@ -372,13 +378,106 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
                 || displayName == null || displayName.isBlank())
             return;
 
+        ChannelClassification classification = plugin.getStaffService().classifyChannel(this.getId());
+        String resolvedDisplayName = displayName;
+        if (plugin.getOutboundChatRenderBridgeRuntime().installed()) {
+            try {
+                RoseChat.MESSAGE_THREAD_POOL.execute(() -> this.publishRenderedOrFallback(
+                        plugin,
+                        message,
+                        eventId,
+                        senderId,
+                        resolvedDisplayName,
+                        plainText,
+                        lineFormat,
+                        classification
+                ));
+                return;
+            } catch (RuntimeException failure) {
+                // Renderer scheduling is best-effort; fall through to the existing plain bridge.
+            }
+        }
+
+        this.publishPlainOutbound(
+                plugin,
+                eventId,
+                senderId,
+                resolvedDisplayName,
+                plainText,
+                classification
+        );
+    }
+
+    private void publishRenderedOrFallback(
+            RoseChat plugin,
+            RoseMessage message,
+            UUID eventId,
+            UUID senderId,
+            String displayName,
+            String canonicalPlainText,
+            String lineFormat,
+            ChannelClassification classification
+    ) {
+        try {
+            MessageContents body = message.parseMessageForDiscordTransport(
+                    message.getSender(),
+                    "{message}"
+            );
+            MessageContents line = message.parseMessageForDiscordTransport(
+                    message.getSender(),
+                    lineFormat == null ? "{message}" : lineFormat
+            );
+
+            OutboundChatRenderBridgeCoordinator.DispatchResult result =
+                    plugin.getOutboundChatRenderBridgeRuntime().publish(
+                            eventId,
+                            senderId,
+                            displayName,
+                            canonicalPlainText,
+                            this.getId(),
+                            classification,
+                            body.build(ChatComposer.plain()),
+                            body.build(ChatComposer.markdown()),
+                            body.build(ChatComposer.json()),
+                            line.build(ChatComposer.plain()),
+                            line.build(ChatComposer.markdown()),
+                            line.build(ChatComposer.json())
+                    );
+
+            if (result != OutboundChatRenderBridgeCoordinator.DispatchResult.NO_BRIDGE
+                    && result != OutboundChatRenderBridgeCoordinator.DispatchResult.BACKPRESSURE
+                    && result != OutboundChatRenderBridgeCoordinator.DispatchResult.FAILED) {
+                return;
+            }
+        } catch (RuntimeException failure) {
+            // Styled Discord rendering is optional; plain V1 remains the migration fallback.
+        }
+
+        this.publishPlainOutbound(
+                plugin,
+                eventId,
+                senderId,
+                displayName,
+                canonicalPlainText,
+                classification
+        );
+    }
+
+    private void publishPlainOutbound(
+            RoseChat plugin,
+            UUID eventId,
+            UUID senderId,
+            String displayName,
+            String plainText,
+            ChannelClassification classification
+    ) {
         plugin.getOutboundChatBridgeRuntime().publish(
                 eventId,
                 senderId,
                 displayName,
                 plainText,
                 this.getId(),
-                plugin.getStaffService().classifyChannel(this.getId())
+                classification
         );
     }
 
@@ -597,7 +696,7 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
         // Disable spam filter for further messages.
         rules.ignoreMessageLogging();
 
-        this.publishToOutboundBridge(message, direction);
+        this.publishToOutboundBridge(message, direction, format);
         this.sendToDiscord(message, direction);
         this.sendToBungee(message, direction);
 
