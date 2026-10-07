@@ -9,6 +9,14 @@ import org.junit.jupiter.api.Test;
 class DiscordSRVListenerCutoverTest {
 
     @Test
+    void postProcessCancellationCoversNormalRoseChatOwnershipAndSuppression() {
+        assertTrue(LegacyDiscordChatPolicy.cancelPostProcess(true, false));
+        assertTrue(LegacyDiscordChatPolicy.cancelPostProcess(true, true));
+        assertTrue(LegacyDiscordChatPolicy.cancelPostProcess(false, true));
+        assertFalse(LegacyDiscordChatPolicy.cancelPostProcess(false, false));
+    }
+
+    @Test
     void legacyInboundRequiresDiscordEnabledAndNoAuthoritativeSuppression() {
         assertTrue(LegacyDiscordChatPolicy.inboundAllowed(true, false));
 
