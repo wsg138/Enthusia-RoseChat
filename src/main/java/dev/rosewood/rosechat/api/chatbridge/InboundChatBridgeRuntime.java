@@ -5,6 +5,7 @@ import dev.rosewood.rosechat.api.staff.ChannelClassification;
 import dev.rosewood.rosechat.chat.channel.Channel;
 import dev.rosewood.rosechat.chat.channel.ChannelMessageOptions;
 import dev.rosewood.rosechat.config.Settings;
+import dev.rosewood.rosechat.hook.channel.rosechat.RoseChatChannel;
 import dev.rosewood.rosechat.manager.ChannelManager;
 import dev.rosewood.rosechat.message.MessageRules;
 import dev.rosewood.rosechat.message.MessageUtils;
@@ -75,6 +76,9 @@ public final class InboundChatBridgeRuntime implements AutoCloseable {
         Channel channel = this.plugin.getManager(ChannelManager.class).getChannel(inbound.logicalChannelId());
         if (channel == null) {
             return InboundChatResult.CHANNEL_NOT_FOUND;
+        }
+        if (!(channel instanceof RoseChatChannel)) {
+            return InboundChatResult.CHANNEL_UNSUPPORTED;
         }
         if (this.plugin.getStaffService() == null) {
             return InboundChatResult.POLICY_UNAVAILABLE;
