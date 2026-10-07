@@ -27,6 +27,7 @@ public record InboundDiscordChatMessage(
     public static final int MAX_ATTACHMENT_COUNT = 10;
     public static final int MAX_ATTACHMENT_URL_LENGTH = 2_048;
     public static final long MAX_LIFETIME_MILLIS = 60_000L;
+    public static final long MAX_FUTURE_SKEW_MILLIS = 5_000L;
 
     private static final Pattern MESSAGE_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._:-]{0,127}");
     private static final Pattern CHANNEL_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,63}");
@@ -52,6 +53,10 @@ public record InboundDiscordChatMessage(
 
     public boolean isExpired(long nowEpochMillis) {
         return nowEpochMillis > expiresAtEpochMillis;
+    }
+
+    public boolean isFutureDated(long nowEpochMillis) {
+        return createdAtEpochMillis > nowEpochMillis + MAX_FUTURE_SKEW_MILLIS;
     }
 
     private static String token(String value, String field, Pattern pattern) {
