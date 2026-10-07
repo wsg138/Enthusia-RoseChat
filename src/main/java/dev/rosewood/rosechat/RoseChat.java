@@ -195,6 +195,7 @@ public class RoseChat extends RosePlugin {
 
     @Override
     public void disable() {
+        this.outboundChatRenderBridgeCoordinator.close();
         this.outboundChatBridgeCoordinator.close();
 
         if (this.aiModerationManager != null) {
