@@ -132,14 +132,16 @@ class InboundDiscordChatMessageTest {
     }
 
     @Test
-    void onlyAcceptedAndDuplicateResultsAreTransportAcknowledgements() {
+    void onlyTransientLocalFailuresRemainRetryable() {
         assertTrue(InboundChatResult.ACCEPTED.acknowledged());
         assertTrue(InboundChatResult.DUPLICATE.acknowledged());
-        for (InboundChatResult result : InboundChatResult.values()) {
-            if (result != InboundChatResult.ACCEPTED && result != InboundChatResult.DUPLICATE) {
-                assertFalse(result.acknowledged(), result + " must not be ACKed");
-            }
-        }
+        assertTrue(InboundChatResult.BLOCKED.acknowledged());
+        assertTrue(InboundChatResult.CHANNEL_NOT_PUBLIC.acknowledged());
+        assertTrue(InboundChatResult.EXPIRED.acknowledged());
+
+        assertFalse(InboundChatResult.POLICY_UNAVAILABLE.acknowledged());
+        assertFalse(InboundChatResult.SATURATED.acknowledged());
+        assertFalse(InboundChatResult.FAILED.acknowledged());
     }
 
     private static InboundDiscordChatMessage message(List<String> attachments, long lifetime) {
