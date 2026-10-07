@@ -39,7 +39,7 @@ Discord-to-Minecraft messages without changing the active DiscordSRV listener.
 to Minecraft-server routing remain responsibilities of the external Enthusia
 transport. RoseChat then independently enforces:
 
-- a short maximum message lifetime and bounded duplicate cache;
+- a short maximum message lifetime, bounded clock skew, and bounded duplicate cache;
 - exact logical RoseChat channel lookup;
 - public-channel classification through the current Staff policy service;
 - channel mute state;
@@ -57,8 +57,9 @@ calls the Minecraft-to-Discord or Bungee fan-out stages.
 Terminal policy/configuration rejections such as blocked content, private/staff
 channels, muted channels, unknown routes, duplicates, and expired messages are
 acknowledged-and-dropped so a transport cannot retry rejected chat until expiry.
-Only transient RoseChat policy unavailability, dedupe saturation, or an internal
-dispatch failure remain retryable within the original message TTL.
+Only transient RoseChat policy unavailability or dedupe saturation remain retryable
+within the original message TTL. A post-admission dispatch failure is terminal because
+partial recipient delivery cannot be ruled out safely.
 
 This checkpoint does **not** yet install StaffBot/Velocity/Paper ingress transport,
 disable the DiscordSRV listener, replace Discord message edit/delete handling, or
