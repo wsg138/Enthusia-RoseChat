@@ -1,5 +1,6 @@
 package dev.rosewood.rosechat.api.chatbridge;
 
+import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -59,6 +60,8 @@ public record InboundChatSender(
         if (!COLOR.matcher(normalized).matches()) {
             throw new IllegalArgumentException("colorHex must be a six-digit RGB color");
         }
-        return normalized.charAt(0) == '#' ? normalized.toUpperCase() : "#" + normalized.toUpperCase();
+        return normalized.charAt(0) == '#'
+                ? normalized.toUpperCase(Locale.ROOT)
+                : "#" + normalized.toUpperCase(Locale.ROOT);
     }
 }
