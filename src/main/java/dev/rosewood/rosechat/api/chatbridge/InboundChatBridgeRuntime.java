@@ -33,6 +33,7 @@ public final class InboundChatBridgeRuntime implements AutoCloseable {
     private final RoseChat plugin;
     private final Clock clock;
     private final int maximumDedupeEntries;
+    private final Object lifecycleLock = new Object();
     private final Object dedupeLock = new Object();
     // Concurrency policy: every access to this insertion-ordered map is guarded by dedupeLock.
     private final Map<String, Long> dedupeUntil = new LinkedHashMap<>();
@@ -55,7 +56,7 @@ public final class InboundChatBridgeRuntime implements AutoCloseable {
      * Accepts one already-authenticated, explicitly routed Discord message.
      *
      * @param inbound bounded provider-neutral message
-     * @return terminal admission result; only ACCEPTED/DUPLICATE are safe transport ACKs
+     * @return admission result whose acknowledgement flag defines transport retry behavior
      */
     public InboundChatResult accept(InboundDiscordChatMessage inbound) {
         Objects.requireNonNull(inbound, "inbound");
@@ -119,20 +120,25 @@ public final class InboundChatBridgeRuntime implements AutoCloseable {
 
         String discordFormat = channel.getSettings().getFormats().get("discord-to-minecraft");
         String format = discordFormat != null ? discordFormat : channel.getSettings().getFormats().get("chat");
-        try {
-            for (RoseMessage message : prepared) {
-                channel.send(new ChannelMessageOptions.Builder()
-                        .wrapper(message)
-                        .discordId(inbound.externalMessageId())
-                        .format(format)
-                        .build());
+        synchronized (this.lifecycleLock) {
+            if (this.closed) {
+                return InboundChatResult.FAILED;
             }
-            return InboundChatResult.ACCEPTED;
-        } catch (RuntimeException exception) {
-            this.plugin.getLogger().warning(
-                    "Provider-neutral Discord ingress failed after admission: "
-                            + exception.getClass().getSimpleName());
-            return InboundChatResult.FAILED;
+            try {
+                for (RoseMessage message : prepared) {
+                    channel.send(new ChannelMessageOptions.Builder()
+                            .wrapper(message)
+                            .discordId(inbound.externalMessageId())
+                            .format(format)
+                            .build());
+                }
+                return InboundChatResult.ACCEPTED;
+            } catch (RuntimeException exception) {
+                this.plugin.getLogger().warning(
+                        "Provider-neutral Discord ingress failed after admission: "
+                                + exception.getClass().getSimpleName());
+                return InboundChatResult.FAILED;
+            }
         }
     }
 
@@ -184,7 +190,9 @@ public final class InboundChatBridgeRuntime implements AutoCloseable {
 
     @Override
     public void close() {
-        this.closed = true;
+        synchronized (this.lifecycleLock) {
+            this.closed = true;
+        }
         synchronized (this.dedupeLock) {
             this.dedupeUntil.clear();
         }
