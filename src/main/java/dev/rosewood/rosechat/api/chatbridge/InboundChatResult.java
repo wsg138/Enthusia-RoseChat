@@ -5,12 +5,14 @@ package dev.rosewood.rosechat.api.chatbridge;
  *
  * <p>{@link #acknowledged()} means the transport must not retry this exact message. Terminal
  * policy/configuration rejections are acknowledged-and-dropped; only transient local
- * unavailability, saturation, or failure remain retryable within the message TTL.</p>
+ * unavailability or saturation remain retryable within the message TTL. A post-admission
+ * dispatch failure is terminal because partial recipient delivery cannot be ruled out safely.</p>
  */
 public enum InboundChatResult {
     ACCEPTED(true),
     DUPLICATE(true),
     EXPIRED(true),
+    INVALID_TIME(true),
     POLICY_UNAVAILABLE(false),
     CHANNEL_NOT_FOUND(true),
     CHANNEL_NOT_PUBLIC(true),
@@ -19,7 +21,7 @@ public enum InboundChatResult {
     TOO_MANY_LINES(true),
     BLOCKED(true),
     EMPTY(true),
-    FAILED(false);
+    FAILED(true);
 
     private final boolean acknowledged;
 
