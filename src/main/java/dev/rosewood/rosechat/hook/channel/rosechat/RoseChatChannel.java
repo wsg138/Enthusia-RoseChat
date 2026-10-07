@@ -3,6 +3,7 @@ package dev.rosewood.rosechat.hook.channel.rosechat;
 import dev.rosewood.rosechat.RoseChat;
 import dev.rosewood.rosechat.api.RoseChatAPI;
 import dev.rosewood.rosechat.api.chatbridge.OutboundChatRenderBridgeCoordinator;
+import dev.rosewood.rosechat.api.staff.ChannelClassification;
 import dev.rosewood.rosechat.api.event.message.MessageReceivedEvent;
 import dev.rosewood.rosechat.api.event.message.PostParseMessageEvent;
 import dev.rosewood.rosechat.api.event.message.PreParseMessageEvent;
@@ -377,20 +378,24 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
                 || displayName == null || displayName.isBlank())
             return;
 
-        var classification = plugin.getStaffService().classifyChannel(this.getId());
+        ChannelClassification classification = plugin.getStaffService().classifyChannel(this.getId());
         String resolvedDisplayName = displayName;
         if (plugin.getOutboundChatRenderBridgeRuntime().installed()) {
-            RoseChat.MESSAGE_THREAD_POOL.execute(() -> this.publishRenderedOrFallback(
-                    plugin,
-                    message,
-                    eventId,
-                    senderId,
-                    resolvedDisplayName,
-                    plainText,
-                    lineFormat,
-                    classification
-            ));
-            return;
+            try {
+                RoseChat.MESSAGE_THREAD_POOL.execute(() -> this.publishRenderedOrFallback(
+                        plugin,
+                        message,
+                        eventId,
+                        senderId,
+                        resolvedDisplayName,
+                        plainText,
+                        lineFormat,
+                        classification
+                ));
+                return;
+            } catch (RuntimeException failure) {
+                // Renderer scheduling is best-effort; fall through to the existing plain bridge.
+            }
         }
 
         this.publishPlainOutbound(
@@ -411,7 +416,7 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
             String displayName,
             String canonicalPlainText,
             String lineFormat,
-            dev.rosewood.rosechat.api.staff.ChannelClassification classification
+            ChannelClassification classification
     ) {
         try {
             MessageContents body = message.parseMessageForDiscordTransport(
@@ -420,7 +425,7 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
             );
             MessageContents line = message.parseMessageForDiscordTransport(
                     message.getSender(),
-                    lineFormat
+                    lineFormat == null ? "{message}" : lineFormat
             );
 
             OutboundChatRenderBridgeCoordinator.DispatchResult result =
@@ -464,7 +469,7 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
             UUID senderId,
             String displayName,
             String plainText,
-            dev.rosewood.rosechat.api.staff.ChannelClassification classification
+            ChannelClassification classification
     ) {
         plugin.getOutboundChatBridgeRuntime().publish(
                 eventId,
