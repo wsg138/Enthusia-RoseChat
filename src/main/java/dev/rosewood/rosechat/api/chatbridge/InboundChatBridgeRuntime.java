@@ -68,6 +68,9 @@ public final class InboundChatBridgeRuntime implements AutoCloseable {
         if (inbound.isExpired(now)) {
             return InboundChatResult.EXPIRED;
         }
+        if (inbound.isFutureDated(now)) {
+            return InboundChatResult.INVALID_TIME;
+        }
 
         Channel channel = this.plugin.getManager(ChannelManager.class).getChannel(inbound.logicalChannelId());
         if (channel == null) {
