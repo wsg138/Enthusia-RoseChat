@@ -41,6 +41,7 @@ transport. RoseChat then independently enforces:
 
 - a short maximum message lifetime, bounded clock skew, and bounded duplicate cache;
 - exact logical RoseChat channel lookup;
+- a wrapper-aware `RoseChatChannel` implementation (group/dynamic channel types are rejected);
 - public-channel classification through the current Staff policy service;
 - channel mute state;
 - RoseChat message filters;
