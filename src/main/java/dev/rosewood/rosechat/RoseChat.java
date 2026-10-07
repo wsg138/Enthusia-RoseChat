@@ -1,6 +1,7 @@
 package dev.rosewood.rosechat;
 
 import dev.rosewood.rosechat.api.RoseChatAPI;
+import dev.rosewood.rosechat.api.chatbridge.InboundChatBridgeRuntime;
 import dev.rosewood.rosechat.api.chatbridge.OutboundChatBridgeCoordinator;
 import dev.rosewood.rosechat.api.chatbridge.OutboundChatBridgeRuntime;
 import dev.rosewood.rosechat.api.staff.RoseChatStaffService;
@@ -82,6 +83,7 @@ public class RoseChat extends RosePlugin {
     private AiModerationManager aiModerationManager;
     private final OutboundChatBridgeCoordinator outboundChatBridgeCoordinator = new OutboundChatBridgeCoordinator();
     private final OutboundChatBridgeRuntime outboundChatBridgeRuntime = new OutboundChatBridgeRuntime(this.outboundChatBridgeCoordinator);
+    private final InboundChatBridgeRuntime inboundChatBridgeRuntime = new InboundChatBridgeRuntime(this);
 
     public RoseChat() {
         super(-1, 5608,
@@ -189,6 +191,7 @@ public class RoseChat extends RosePlugin {
 
     @Override
     public void disable() {
+        this.inboundChatBridgeRuntime.close();
         this.outboundChatBridgeCoordinator.close();
 
         if (this.aiModerationManager != null) {
@@ -328,6 +331,10 @@ public class RoseChat extends RosePlugin {
 
     public OutboundChatBridgeRuntime getOutboundChatBridgeRuntime() {
         return this.outboundChatBridgeRuntime;
+    }
+
+    public InboundChatBridgeRuntime getInboundChatBridgeRuntime() {
+        return this.inboundChatBridgeRuntime;
     }
 
     @Override
