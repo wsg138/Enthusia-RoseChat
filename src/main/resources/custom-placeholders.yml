@@ -234,16 +234,19 @@ item:
 # %user_name% - The user's name.
 # %user_role% - The user's role.
 # %user_color% - The user's color.
+# %discord_linked% - Whether DiscordSRV links this sender to a Minecraft UUID.
 discord-player:
   text:
-    default: "&8[%user_color%%user_role%&8] %user_color%%user_nickname%"
+    condition: "%discord_linked%"
+    true: "{prefix}%user_nickname%"
+    default: "&7%user_nickname%"
   hover:
     default:
       - "&7Discord: &f%user_name%"
 
 from-discord:
   text:
-    default: "&dDiscord &7| "
+    default: "&6[D]&r "
 
 discord-channel-link:
   text:
