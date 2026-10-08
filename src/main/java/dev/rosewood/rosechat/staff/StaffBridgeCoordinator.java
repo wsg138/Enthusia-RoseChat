@@ -14,7 +14,11 @@ import dev.rosewood.rosechat.api.staff.TransmissionContext;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.logging.Level;
@@ -25,6 +29,7 @@ final class StaffBridgeCoordinator implements AutoCloseable {
             "Your message could not be checked right now. Please try again shortly.";
 
     private final AtomicReference<InstalledBridge> installed;
+    private final AtomicLong revision = new AtomicLong();
     private final Logger logger;
     private final Predicate<PresenceContext> presenceRenderer;
     private volatile boolean closed;
@@ -68,6 +73,7 @@ final class StaffBridgeCoordinator implements AutoCloseable {
             );
         }
         this.installed.set(candidate);
+        this.revision.incrementAndGet();
 
         return new Registration(candidate);
     }
@@ -106,6 +112,36 @@ final class StaffBridgeCoordinator implements AutoCloseable {
                 "enforceMute",
                 () -> current.bridge().enforceMute(transmission)
         );
+    }
+
+    CompletionStage<ModerationDecision> enforceDiscordMute(TransmissionContext transmission) {
+        InstalledBridge current = this.installed.get();
+        if (this.closed) {
+            return CompletableFuture.completedFuture(ModerationDecision.block(CALLBACK_FAILURE_FEEDBACK));
+        }
+        if (current == null) {
+            return CompletableFuture.completedFuture(ModerationDecision.allow());
+        }
+        try {
+            // Copy: timeout must not mutate a provider-owned/shared future.
+            return Objects.requireNonNull(current.bridge().enforceDiscordMute(transmission))
+                    .toCompletableFuture().copy()
+                    .completeOnTimeout(ModerationDecision.block(CALLBACK_FAILURE_FEEDBACK), 2500, TimeUnit.MILLISECONDS)
+                    .handle((decision, failure) -> {
+                        if (failure != null) {
+                            this.logCallbackFailure(current, "enforceDiscordMute", failure);
+                        }
+                        return failure != null || decision == null || this.closed || this.installed.get() != current
+                                ? ModerationDecision.block(CALLBACK_FAILURE_FEEDBACK) : decision;
+                    });
+        } catch (RuntimeException | LinkageError exception) {
+            this.logCallbackFailure(current, "enforceDiscordMute", exception);
+            return CompletableFuture.completedFuture(ModerationDecision.block(CALLBACK_FAILURE_FEEDBACK));
+        }
+    }
+
+    long revision() {
+        return this.revision.get();
     }
 
     ModerationDecision beforeBroadcast(BroadcastContext broadcast) {
@@ -174,6 +210,7 @@ final class StaffBridgeCoordinator implements AutoCloseable {
     public synchronized void close() {
         this.closed = true;
         this.installed.set(null);
+        this.revision.incrementAndGet();
     }
 
     private ModerationDecision safeDecision(
@@ -248,7 +285,8 @@ final class StaffBridgeCoordinator implements AutoCloseable {
 
         @Override
         public void close() {
-            StaffBridgeCoordinator.this.installed.compareAndSet(this.bridge, null);
+            if (StaffBridgeCoordinator.this.installed.compareAndSet(this.bridge, null))
+                StaffBridgeCoordinator.this.revision.incrementAndGet();
         }
     }
 }

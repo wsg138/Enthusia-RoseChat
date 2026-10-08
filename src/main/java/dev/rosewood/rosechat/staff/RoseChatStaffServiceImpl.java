@@ -26,6 +26,8 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
@@ -195,6 +197,23 @@ public final class RoseChatStaffServiceImpl implements RoseChatStaffService, Aut
                 MessageSurface.CHANNEL,
                 false
         );
+    }
+
+    public CompletionStage<Boolean> allowDiscordPreflight(RosePlayer sender, String channelId, String message) {
+        UUID senderId = sender.getUUID();
+        if (senderId == null) {
+            return CompletableFuture.completedFuture(true);
+        }
+        long revision = this.bridge.revision();
+        return this.bridge.enforceDiscordMute(new TransmissionContext(
+                senderId, safeName(sender), MessageSurface.CHANNEL, channelId, message
+        )).thenApplyAsync(decision -> this.plugin.isEnabled() && this.bridge.revision() == revision
+                && this.applyDecision(decision, sender, message, channelId, MessageSurface.CHANNEL, false),
+                action -> Bukkit.getScheduler().runTaskAsynchronously(this.plugin, action));
+    }
+
+    public long moderationRevision() {
+        return this.bridge.revision();
     }
 
     public boolean allowPrivatePreflight(RoseMessage message, RosePlayer recipient, String plainMessage) {
