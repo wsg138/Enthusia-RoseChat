@@ -303,6 +303,17 @@ class CentralModerationClientTest {
     }
 
     @Test
+    void rejectsBidiFormattingInPlayerNotice() {
+        JsonObject json = new Gson().fromJson(blockBody(), JsonObject.class);
+        json.addProperty("player_notice",
+                "Your message was blocked \u202e because it may contain harassment.");
+        respond(200, new Gson().toJson(json));
+        CentralModerationDecision decision = join(client().moderate(request()));
+        assertEquals("Your message was blocked by chat moderation. "
+                + "If this seems wrong, contact staff.", decision.safePlayerNotice());
+    }
+
+    @Test
     void requestShapeMatchesServiceSchema() {
         respond(200, allowBody());
 
