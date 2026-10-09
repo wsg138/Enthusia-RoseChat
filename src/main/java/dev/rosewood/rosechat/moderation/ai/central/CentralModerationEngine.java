@@ -566,7 +566,12 @@ public final class CentralModerationEngine {
                 timer.cancel(false);
             }
             pendingByExternalId.remove(pending.externalMessageId);
-            actions.notifyBlocked(pending.senderId, decision.safePlayerNotice());
+            String blockNotice = decision.safePlayerNotice();
+            if (pending.profile == ChannelProfile.MINECRAFT_PRIVATE) {
+                blockNotice = blockNotice.replaceFirst("^Your message was blocked",
+                        "Your private message was blocked");
+            }
+            actions.notifyBlocked(pending.senderId, blockNotice);
             audit(pending, "CENTRAL_BLOCK_PRE_BROADCAST", decision.semanticLabel(),
                     decision.confidence(), decision.reasonCodes(), latencyMs);
             actions.alertStaff("BLOCKED " + pending.senderName + " [" + decision.semanticLabel() + "]");
