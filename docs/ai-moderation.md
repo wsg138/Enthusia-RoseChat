@@ -50,6 +50,34 @@ An atomic message lifecycle prevents a response racing the timeout from publishi
 
 Private messages use the same bounded central engine after RoseChat's local PM checks and message rules. An early `BLOCK` suppresses delivery. If the hold expires, the PM fails open and is delivered after mutable local permission/mute state is revalidated. RoseChat has no authoritative post-send PM retraction primitive, so a later `BLOCK` is audited and surfaced to staff instead of guessing a deletion or telling the sender the message was removed.
 
+## Friendly block explanations
+
+For a successfully enforced early BLOCK, RoseChat already has a private
+`notifyBlocked` hook. It now prefers the optional central
+`player_notice` field instead of displaying raw classifier constants such
+as `SEVERE_HARASSMENT`. The central message is a restrained, fixed-format
+explanation (e.g. possible harassment or prohibited language) plus a reminder
+to contact staff if it was a mistake.
+
+The client refuses malformed, oversized or markup-bearing notice text and
+falls back to a generic message. For Minecraft private messages, the notice
+correctly says "Your private message was blocked"; public chat uses "Your
+message was blocked". A successfully removed public message uses the
+"Your public message was removed" wording. The existing exact-message
+ledger prevents duplicate enforcement/notifications on retries.
+
+RoseChat does not claim a late, already-delivered private message was
+retracted. Late PM blocks still go to the staff diagnostic flow without a
+false player deletion notice. Fail-open, degraded, ALLOW and exempt responses
+are never presented as player blocks. The API still determines the action;
+the notice itself confers no punishment/strike authority.
+
+This integration depends on an independently approved central API version
+which supplies `player_notice`. Earlier API versions remain compatible:
+RoseChat uses a generic safe notice when that field is absent. Nothing in
+this draft enables production blocking, changes channel exemptions or
+requests a live server reload.
+
 ## Failure behavior
 
 Moderation is a soft subsystem. It has no authority to take chat down.
