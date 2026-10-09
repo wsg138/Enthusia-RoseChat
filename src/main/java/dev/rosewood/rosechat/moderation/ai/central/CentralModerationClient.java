@@ -196,7 +196,8 @@ public final class CentralModerationClient {
                     optionalString(root, "local_model_version"),
                     optionalString(root, "fallback_state"),
                     root.has("idempotent_replay") && !root.get("idempotent_replay").isJsonNull()
-                            && root.get("idempotent_replay").getAsBoolean()
+                            && root.get("idempotent_replay").getAsBoolean(),
+                    optionalString(root, "player_notice")
             );
         } catch (CentralModerationException.MalformedResponse malformed) {
             throw malformed;
