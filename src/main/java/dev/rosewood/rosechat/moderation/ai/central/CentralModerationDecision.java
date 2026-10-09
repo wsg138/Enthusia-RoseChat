@@ -69,7 +69,7 @@ public record CentralModerationDecision(
         if (playerNotice.length() <= 220
                 && playerNotice.startsWith("Your message was blocked ")
                 && playerNotice.chars().noneMatch(ch ->
-                        ch < 32 || ch == 127 || ch == '&' || ch == '<'
+                        ch < 32 || ch > 126 || ch == '&' || ch == '<'
                                 || ch == '>' || ch == 0xA7)) {
             return playerNotice;
         }
