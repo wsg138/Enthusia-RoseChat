@@ -559,9 +559,6 @@ public final class CentralModerationEngine {
         MessageState previous = pending.state.getAndUpdate(state ->
                 state == MessageState.PENDING ? MessageState.BLOCKED : state);
         boolean late = previous == MessageState.PUBLISHED;
-        String surface = pending.profile == ChannelProfile.MINECRAFT_PRIVATE
-                ? "private message"
-                : "public message";
         if (previous == MessageState.PENDING) {
             metrics.deleted(false);
             ScheduledFuture<?> timer = pending.holdTimer;
@@ -569,8 +566,12 @@ public final class CentralModerationEngine {
                 timer.cancel(false);
             }
             pendingByExternalId.remove(pending.externalMessageId);
-            actions.notifyBlocked(pending.senderId,
-                    "Your " + surface + " was blocked by AI moderation (" + decision.semanticLabel() + ").");
+            String blockNotice = decision.safePlayerNotice();
+            if (pending.profile == ChannelProfile.MINECRAFT_PRIVATE) {
+                blockNotice = blockNotice.replaceFirst("^Your message was blocked",
+                        "Your private message was blocked");
+            }
+            actions.notifyBlocked(pending.senderId, blockNotice);
             audit(pending, "CENTRAL_BLOCK_PRE_BROADCAST", decision.semanticLabel(),
                     decision.confidence(), decision.reasonCodes(), latencyMs);
             actions.alertStaff("BLOCKED " + pending.senderName + " [" + decision.semanticLabel() + "]");
@@ -578,8 +579,7 @@ public final class CentralModerationEngine {
             metrics.deleted(true);
             long blockGen = generation.get();
             pending.deleteRequested.set(true);
-            actions.notifyRemoved(pending.senderId,
-                    "Your public message was removed by AI moderation (" + decision.semanticLabel() + ").");
+            actions.notifyRemoved(pending.senderId, decision.safeRemovalNotice());
             audit(pending, "CENTRAL_BLOCK_LATE", decision.semanticLabel(),
                     decision.confidence(), decision.reasonCodes(), latencyMs);
             actions.alertStaff("REMOVED " + pending.senderName + " [" + decision.semanticLabel() + "]");

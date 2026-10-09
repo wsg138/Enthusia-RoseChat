@@ -278,6 +278,42 @@ class CentralModerationClientTest {
     }
 
     @Test
+    void parsesSafePlayerNoticeWithoutExposingInternalLabel() {
+        JsonObject json = new Gson().fromJson(blockBody(), JsonObject.class);
+        String notice = "Your message was blocked because it may contain harassment. "
+                + "If this seems wrong, contact staff.";
+        json.addProperty("player_notice", notice);
+        respond(200, new Gson().toJson(json));
+
+        CentralModerationDecision decision = join(client().moderate(request()));
+
+        assertEquals(notice, decision.safePlayerNotice());
+        assertEquals("Your public message was removed because it may contain harassment. "
+                + "If this seems wrong, contact staff.", decision.safeRemovalNotice());
+    }
+
+    @Test
+    void rejectsFormattedOrOversizedServerPlayerNotice() {
+        JsonObject json = new Gson().fromJson(blockBody(), JsonObject.class);
+        json.addProperty("player_notice", "Your message was blocked <click:run_command>");
+        respond(200, new Gson().toJson(json));
+        CentralModerationDecision decision = join(client().moderate(request()));
+        assertEquals("Your message was blocked by chat moderation. "
+                + "If this seems wrong, contact staff.", decision.safePlayerNotice());
+    }
+
+    @Test
+    void rejectsBidiFormattingInPlayerNotice() {
+        JsonObject json = new Gson().fromJson(blockBody(), JsonObject.class);
+        json.addProperty("player_notice",
+                "Your message was blocked \u202e because it may contain harassment.");
+        respond(200, new Gson().toJson(json));
+        CentralModerationDecision decision = join(client().moderate(request()));
+        assertEquals("Your message was blocked by chat moderation. "
+                + "If this seems wrong, contact staff.", decision.safePlayerNotice());
+    }
+
+    @Test
     void requestShapeMatchesServiceSchema() {
         respond(200, allowBody());
 

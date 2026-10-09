@@ -25,7 +25,8 @@ public record CentralModerationDecision(
         String policyVersion,
         String modelVersion,
         String fallbackState,
-        boolean idempotentReplay
+        boolean idempotentReplay,
+        String playerNotice
 ) {
     public CentralModerationDecision {
         Objects.requireNonNull(messageAction, "messageAction");
@@ -39,6 +40,49 @@ public record CentralModerationDecision(
         policyVersion = policyVersion == null ? "" : policyVersion;
         modelVersion = modelVersion == null ? "" : modelVersion;
         fallbackState = fallbackState == null ? "" : fallbackState;
+        playerNotice = playerNotice == null ? "" : playerNotice;
+    }
+
+    /** Source-compatible constructor for older W13 call sites/tests. */
+    public CentralModerationDecision(
+            MessageAction messageAction, String ingestionStatus,
+            boolean degraded, String semanticLabel, Double confidence,
+            String reviewPriority, String strikeRecommendation,
+            String containment, List<String> reasonCodes,
+            List<RelatedMessageRef> relatedMessages, String policyVersion,
+            String modelVersion, String fallbackState, boolean idempotentReplay
+    ) {
+        this(messageAction, ingestionStatus, degraded, semanticLabel, confidence,
+                reviewPriority, strikeRecommendation, containment, reasonCodes,
+                relatedMessages, policyVersion, modelVersion, fallbackState,
+                idempotentReplay, "");
+    }
+
+    /**
+     * API notices are private client-facing hints, not trusted markup.
+     * Reject newlines/control codes/formatting and fall back to a safe message.
+     */
+    public String safePlayerNotice() {
+        if (!enforceBlock()) {
+            return "";
+        }
+        if (playerNotice.length() <= 220
+                && playerNotice.startsWith("Your message was blocked ")
+                && playerNotice.chars().noneMatch(ch ->
+                        ch < 32 || ch > 126 || ch == '&' || ch == '<'
+                                || ch == '>' || ch == 0xA7)) {
+            return playerNotice;
+        }
+        return "Your message was blocked by chat moderation. If this seems wrong, contact staff.";
+    }
+
+    public String safeRemovalNotice() {
+        String notice = safePlayerNotice();
+        if (notice.isEmpty()) {
+            return "";
+        }
+        return notice.replaceFirst("^Your message was blocked",
+                "Your public message was removed");
     }
 
     /**

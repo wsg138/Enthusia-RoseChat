@@ -245,7 +245,8 @@ class CentralModerationEngineTest {
 
         assertTrue(actions.published.isEmpty(), "blocked message must never be published");
         assertEquals(1, metrics.snapshot().centralBlocked());
-        assertTrue(actions.blockedNotices.get(0).contains("SEVERE_HARASSMENT"));
+        assertTrue(actions.blockedNotices.get(0).contains("chat moderation"));
+        assertFalse(actions.blockedNotices.get(0).contains("SEVERE_HARASSMENT"));
         assertTrue(actions.audits.stream().anyMatch(a -> "CENTRAL_BLOCK_PRE_BROADCAST".equals(a.outcome())));
     }
 
