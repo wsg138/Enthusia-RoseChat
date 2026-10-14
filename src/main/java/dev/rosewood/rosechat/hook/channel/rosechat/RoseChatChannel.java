@@ -380,6 +380,7 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
 
         ChannelClassification classification = plugin.getStaffService().classifyChannel(this.getId());
         String resolvedDisplayName = displayName;
+        String transportFormat = this.getSettings().getDiscordTransportFormat(lineFormat);
         if (plugin.getOutboundChatRenderBridgeRuntime().installed()) {
             try {
                 RoseChat.MESSAGE_THREAD_POOL.execute(() -> this.publishRenderedOrFallback(
@@ -389,7 +390,7 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
                         senderId,
                         resolvedDisplayName,
                         plainText,
-                        lineFormat,
+                        transportFormat,
                         classification
                 ));
                 return;

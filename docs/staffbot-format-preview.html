@@ -1,0 +1,24 @@
+<div id="staffbot-format-preview">
+  <label class="form-label" for="staffbot-format-state">#staff-bot-testing · simulated formatting</label>
+  <select class="form-select" id="staffbot-format-state">
+    <option value="after">Proposed clean rank format</option>
+    <option value="before">Current formatting from screenshot</option>
+  </select>
+  <div class="card" style="margin-top:1rem;overflow-wrap:anywhere">
+    <strong>Enthusia SMP</strong>
+    <p id="staffbot-format-message" aria-live="polite">[SMP · linked] [11] [Avid] Kavebo: hi</p>
+    <p class="text-small">StaffBot identity label remains separate. Runtime activation pending.</p>
+  </div>
+</div>
+<script>
+(() => {
+  const root = document.getElementById('staffbot-format-preview');
+  const picker = root.querySelector('#staffbot-format-state');
+  const output = root.querySelector('#staffbot-format-message');
+  picker.addEventListener('change', () => {
+    output.textContent = picker.value === 'before'
+      ? '[SMP · linked] [11] [**Avid]<reset> Kavebo: hi'
+      : '[SMP · linked] [11] [Avid] Kavebo: hi';
+  });
+})();
+</script>

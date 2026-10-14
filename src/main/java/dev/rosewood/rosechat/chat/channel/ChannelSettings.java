@@ -39,6 +39,12 @@ public class ChannelSettings {
         return this.formats;
     }
 
+    /** Returns the provider-neutral Discord format, preserving existing rendering when unset. */
+    public String getDiscordTransportFormat(String fallback) {
+        String format = this.formats.get("discord-transport");
+        return format == null || format.isBlank() ? fallback : format;
+    }
+
     public List<String> getCommands() {
         return this.commands;
     }
