@@ -209,9 +209,7 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
 
         // This message is likely sent from discord to minecraft.
         if (options.wrapper() != null) {
-            if (!this.passesStaffPreflight(options, options.wrapper()))
-                return;
-            this.send(options, options.wrapper(), MessageDirection.DISCORD_TO_MINECRAFT, new MessageRules());
+            this.sendDiscordAfterPreflight(options);
             return;
         }
 
@@ -719,6 +717,29 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
         } else {
             this.sendToChannelMembers(message, direction, format, options.discordId());
         }
+    }
+
+    private void sendDiscordAfterPreflight(ChannelMessageOptions options) {
+        RoseChat plugin = RoseChat.getInstance();
+        RoseMessage message = options.wrapper();
+        var staff = plugin.getStaffService();
+        if (options.bypassStaffBridge() || staff == null) {
+            this.send(options, message, MessageDirection.DISCORD_TO_MINECRAFT, new MessageRules());
+            return;
+        }
+        String input = message.getPlayerInput() == null ? options.message() : message.getPlayerInput();
+        long revision = staff.moderationRevision();
+        staff.allowDiscordPreflight(message.getSender(), this.getId(), input).thenAccept(allowed -> {
+            if (!allowed || !plugin.isEnabled())
+                return;
+            // Recipient enumeration and console events belong to the server thread.
+            // Per-recipient parsing retains its existing internal worker dispatch.
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (plugin.isEnabled() && plugin.getStaffService() == staff
+                        && staff.moderationRevision() == revision)
+                    this.send(options, message, MessageDirection.DISCORD_TO_MINECRAFT, new MessageRules());
+            });
+        });
     }
 
     private boolean passesStaffPreflight(ChannelMessageOptions options, RoseMessage message) {
