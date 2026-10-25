@@ -2,6 +2,10 @@ package dev.rosewood.rosechat.hook.channel.rosechat;
 
 import dev.rosewood.rosechat.RoseChat;
 import dev.rosewood.rosechat.api.RoseChatAPI;
+import dev.rosewood.rosechat.api.chatbridge.OutboundChatBridgeCoordinator;
+import dev.rosewood.rosechat.api.chatbridge.OutboundChatMessage;
+import dev.rosewood.rosechat.api.staff.ChannelClassification;
+import dev.rosewood.rosechat.api.staff.RoseChatStaffService;
 import dev.rosewood.rosechat.api.event.message.MessageReceivedEvent;
 import dev.rosewood.rosechat.api.event.message.PostParseMessageEvent;
 import dev.rosewood.rosechat.api.event.message.PreParseMessageEvent;
@@ -562,12 +566,48 @@ public class RoseChatChannel extends ConditionalChannel implements Spyable {
 
         this.sendToDiscord(message, direction);
         this.sendToBungee(message, direction);
+        this.publishAcceptedMinecraftChat(message, direction);
 
         // Send to all visible anywhere recipients.
         if (this.visibleAnywhere) {
            this.sendToVisibleAnywhere(message, direction, format, options.discordId());
         } else {
             this.sendToChannelMembers(message, direction, format, options.discordId());
+        }
+    }
+
+    /**
+     * Only after RoseChat accepted the message: never forward raw events,
+     * Discord echoes, server replay, command-only chat or staff/private channels.
+     * Bound to the configured global PUBLIC channel for TEST plain-text migration.
+     */
+    private void publishAcceptedMinecraftChat(RoseMessage message, MessageDirection direction) {
+        if (direction != MessageDirection.PLAYER_TO_SERVER
+                || message.getSender() == null || !message.getSender().isPlayer()) {
+            return;
+        }
+        RoseChatStaffService staff = RoseChat.getInstance().getStaffService();
+        if (staff == null || !this.getId().equals(staff.getGlobalChannel())
+                || staff.classifyChannel(this.getId()) != ChannelClassification.PUBLIC) {
+            return;
+        }
+        String input = message.getPlayerInput();
+        UUID id = message.getUUID();
+        UUID senderId = message.getSender().getUUID();
+        String name = message.getSender().getRealName();
+        if (id == null || senderId == null || name == null || name.isBlank()
+                || input == null || input.isBlank()
+                || input.length() > OutboundChatBridgeCoordinator.MAX_PLAIN_TEXT_LENGTH) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        try {
+            RoseChatAPI.getInstance().publishOutboundChatBridge(new OutboundChatMessage(
+                    id, id.toString(), id.toString(), now, now + 15_000,
+                    this.getId(), ChannelClassification.PUBLIC,
+                    OutboundChatMessage.Origin.MINECRAFT, senderId, name, input));
+        } catch (RuntimeException ignored) {
+            // Optional TEST relay failure must not affect Minecraft chat.
         }
     }
 

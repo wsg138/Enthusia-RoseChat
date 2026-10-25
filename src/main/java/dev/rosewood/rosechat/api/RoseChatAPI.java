@@ -1,6 +1,9 @@
 package dev.rosewood.rosechat.api;
 
 import dev.rosewood.rosechat.RoseChat;
+import dev.rosewood.rosechat.api.chatbridge.OutboundChatBridge;
+import dev.rosewood.rosechat.api.chatbridge.OutboundChatBridgeCoordinator;
+import dev.rosewood.rosechat.api.chatbridge.OutboundChatMessage;
 import dev.rosewood.rosechat.api.deletion.AdventureMessageDeletionHelper;
 import dev.rosewood.rosechat.api.deletion.BungeeMessageDeletionHelper;
 import dev.rosewood.rosechat.api.deletion.MessageDeletionHelper;
@@ -50,6 +53,7 @@ public final class RoseChatAPI {
     private static RoseChatAPI instance;
     private final RoseChat plugin;
     private final MessageDeletionHelper messageDeletionHelper;
+    private final OutboundChatBridgeCoordinator outboundChatBridgeCoordinator = new OutboundChatBridgeCoordinator();
     private Class<?> spigotConfigClass;
     private Field bungeeField;
     private Class<?> paperConfigClass;
@@ -69,6 +73,16 @@ public final class RoseChatAPI {
             instance = new RoseChatAPI();
 
         return instance;
+    }
+
+    /** Installs the one best-effort Minecraft outbound bridge. */
+    public OutboundChatBridgeCoordinator.Registration installOutboundChatBridge(OutboundChatBridge bridge) {
+        return this.outboundChatBridgeCoordinator.install(bridge);
+    }
+
+    /** Offers a policy-approved Minecraft message without blocking Minecraft chat. */
+    public OutboundChatBridgeCoordinator.DispatchResult publishOutboundChatBridge(OutboundChatMessage message) {
+        return this.outboundChatBridgeCoordinator.publish(message);
     }
 
     /**
