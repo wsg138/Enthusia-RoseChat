@@ -97,7 +97,13 @@ dependencies {
 
     testImplementation platform('org.junit:junit-bom:5.12.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
-    testRuntimeOnly 'io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT', {
+    // TEST Discord rank regression requires Bukkit, Vault, PAPI, Bungee and Mockito
+    // classes at compile time; these are test-only, never bundled in RoseChat.
+    testImplementation 'org.mockito:mockito-core:5.23.0'
+    testImplementation 'com.github.milkbowl:vault:1.7.3'
+    testImplementation 'me.clip:placeholderapi:2.11.6'
+    testImplementation 'net.md-5:bungeecord-chat:1.21-R0.5-20251216.193400-13'
+    testImplementation 'io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT', {
         exclude group: 'net.md-5'
     }
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

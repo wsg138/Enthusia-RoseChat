@@ -117,3 +117,9 @@ Never place production Discord tokens, database credentials, identifiable chat/p
 - Use integration/runtime tests for actual Bukkit/plugin/provider interactions.
 - Preserve failing regression cases when they expose genuine bugs; fix the owning production behavior rather than weakening the test.
 - Update this guide whenever a new major feature family becomes covered or the canonical CI/result locations change.
+
+## TEST-only Discord identity/rank forward-port checks
+
+- `DiscordPlaceholderDefaultsTest` — missing/legacy Discord text upgrade, custom and empty text preservation, comments, persisted reload and idempotence.
+- `DiscordRankRenderingTest` — linked/unlinked Discord text through nested RoseChat placeholders, tokenizers and plain composition; real account/rank/client delivery remains a runtime acceptance gate.
+- `DiscordIdentityPlaceholdersTest` — linked identity eligibility and prevention of rank spoofing for unlinked users.
