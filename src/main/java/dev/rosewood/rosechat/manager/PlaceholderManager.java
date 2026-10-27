@@ -1,6 +1,7 @@
 package dev.rosewood.rosechat.manager;
 
 import dev.rosewood.rosechat.config.Settings;
+import dev.rosewood.rosechat.config.DiscordPlaceholderDefaults;
 import dev.rosewood.rosechat.placeholder.ConditionManager;
 import dev.rosewood.rosechat.placeholder.CustomPlaceholder;
 import dev.rosewood.rosechat.placeholder.DiscordEmbedPlaceholder;
@@ -9,6 +10,10 @@ import dev.rosewood.rosegarden.RosePlugin;
 import dev.rosewood.rosegarden.config.CommentedFileConfiguration;
 import dev.rosewood.rosegarden.manager.Manager;
 import java.io.File;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -42,6 +47,18 @@ public class PlaceholderManager extends Manager {
             this.rosePlugin.saveResource("custom-placeholders.yml", false);
 
         CommentedFileConfiguration placeholderConfiguration = CommentedFileConfiguration.loadConfiguration(placeholderFile);
+        // Preserve operator-owned custom formats; upgrade only missing or
+        // untouched legacy Discord defaults for linked/unlinked rank safety.
+        try (InputStream input = this.rosePlugin.getResource("custom-placeholders.yml")) {
+            if (input == null)
+                throw new IllegalStateException("Missing bundled custom-placeholders.yml");
+            CommentedFileConfiguration defaults = CommentedFileConfiguration.loadConfiguration(
+                    new InputStreamReader(input, StandardCharsets.UTF_8));
+            if (DiscordPlaceholderDefaults.merge(placeholderConfiguration, defaults))
+                placeholderConfiguration.save(placeholderFile);
+        } catch (IOException e) {
+            throw new IllegalStateException("Unable to read bundled Discord placeholder defaults", e);
+        }
 
         // Placeholders
         for (String id : placeholderConfiguration.getKeys(false)) {
