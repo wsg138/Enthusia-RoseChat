@@ -5,11 +5,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import dev.rosewood.rosechat.api.RoseChatAPI;
-import java.lang.reflect.Method;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.RecordComponent;
 import java.util.Arrays;
 import java.util.UUID;
+import java.util.HashSet;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -20,16 +23,18 @@ import org.junit.jupiter.api.Test;
 class StaffBotStyledOutboundApiCompatibilityTest {
     @Test
     void staffBotCanInstallStyledAndPlainOutboundBridgesByExactMethodSignature()
-            throws ReflectiveOperationException {
-        Method styled = RoseChatAPI.class.getMethod(
-                "installOutboundChatRenderBridge", OutboundChatRenderBridge.class);
-        assertEquals(OutboundChatRenderBridgeCoordinator.Registration.class,
-                styled.getReturnType());
-
-        Method plain = RoseChatAPI.class.getMethod(
-                "installOutboundChatBridge", OutboundChatBridge.class);
-        assertEquals(OutboundChatBridgeCoordinator.Registration.class,
-                plain.getReturnType());
+            throws IOException {
+        // RoseChatAPI depends on Bukkit and cannot be class-loaded in a plain
+        // CI unit-test JVM. Inspect its class-file method table instead.
+        Set<String> signatures = compiledApiMethodSignatures();
+        assertTrue(signatures.contains(
+                "installOutboundChatRenderBridge:"
+                + "(Ldev/rosewood/rosechat/api/chatbridge/OutboundChatRenderBridge;)"
+                + "Ldev/rosewood/rosechat/api/chatbridge/OutboundChatRenderBridgeCoordinator$Registration;"));
+        assertTrue(signatures.contains(
+                "installOutboundChatBridge:"
+                + "(Ldev/rosewood/rosechat/api/chatbridge/OutboundChatBridge;)"
+                + "Ldev/rosewood/rosechat/api/chatbridge/OutboundChatBridgeCoordinator$Registration;"));
     }
 
     @Test
@@ -71,5 +76,65 @@ class StaffBotStyledOutboundApiCompatibilityTest {
         assertEquals("Player: [item] hello", rich.linePlainText());
         assertFalse(rich.isExpired(10001L));
         assertNotNull(rich.message().canonicalMessageId());
+    }
+
+    private static Set<String> compiledApiMethodSignatures() throws IOException {
+        String resource = "dev/rosewood/rosechat/api/RoseChatAPI.class";
+        try (InputStream bytes = StaffBotStyledOutboundApiCompatibilityTest.class
+                .getClassLoader().getResourceAsStream(resource)) {
+            assertNotNull(bytes, "RoseChatAPI class file must be compiled before ABI tests");
+            DataInputStream input = new DataInputStream(bytes);
+            assertEquals(0xCAFEBABE, input.readInt());
+            input.readUnsignedShort(); // minor
+            input.readUnsignedShort(); // major
+            int poolCount = input.readUnsignedShort();
+            String[] pool = new String[poolCount];
+            for (int i = 1; i < poolCount; i++) {
+                int tag = input.readUnsignedByte();
+                switch (tag) {
+                    case 1 -> pool[i] = input.readUTF();
+                    case 3, 4 -> input.skipNBytes(4);
+                    case 5, 6 -> {
+                        input.skipNBytes(8);
+                        i++; // double-width constant pool slot
+                    }
+                    case 7, 8, 16, 19, 20 -> input.skipNBytes(2);
+                    case 9, 10, 11, 12, 17, 18 -> input.skipNBytes(4);
+                    case 15 -> input.skipNBytes(3);
+                    default -> throw new IOException("unsupported class file constant type");
+                }
+            }
+            input.skipNBytes(6); // class access flags, this_class, super_class
+            int interfaces = input.readUnsignedShort();
+            input.skipNBytes(2L * interfaces);
+            int fields = input.readUnsignedShort();
+            for (int i = 0; i < fields; i++) {
+                skipMember(input);
+            }
+            int methods = input.readUnsignedShort();
+            Set<String> signatures = new HashSet<>();
+            for (int i = 0; i < methods; i++) {
+                input.readUnsignedShort(); // access flags
+                int name = input.readUnsignedShort();
+                int descriptor = input.readUnsignedShort();
+                signatures.add(pool[name] + ":" + pool[descriptor]);
+                skipAttributes(input);
+            }
+            return signatures;
+        }
+    }
+
+    private static void skipMember(DataInputStream input) throws IOException {
+        input.skipNBytes(6); // access, name, descriptor
+        skipAttributes(input);
+    }
+
+    private static void skipAttributes(DataInputStream input) throws IOException {
+        int count = input.readUnsignedShort();
+        for (int i = 0; i < count; i++) {
+            input.readUnsignedShort(); // attribute name constant
+            long length = Integer.toUnsignedLong(input.readInt());
+            input.skipNBytes(length);
+        }
     }
 }
